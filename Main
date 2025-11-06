@@ -90,7 +90,7 @@ BuildUI = function()
                 task.spawn(function()
                     while isMainAutoClicking do 
                         ClickService.click._re:FireServer()
-                        task.wait(0.001)
+                        task.wait(0.05)
                     end
                 end)
             end
@@ -2929,9 +2929,14 @@ BuildUI = function()
                 end
                 
                 if enabled then
+                    
                     if AutoClick and not AutoClick.Value then
                         AutoClick:SetValue(true)
                     end
+
+                    -- Track active quest handlers
+                    local activeQuestHandlers = {}
+                    local spaceWorldPurchaseActive = false
 
                     task.spawn(function()
                         while _G.MapQuestEnabled do
@@ -2941,14 +2946,9 @@ BuildUI = function()
                                 local Maps = require(ReplicatedStorage.Shared.List.Maps)
                                 local playerData = DataController:getData()
                                 
-                                if not playerData then return end
-                                
-                                AutoHatch:SetValue(false)
-                                AutoRebirth:SetValue(false)
-                                CraftAllToggle:SetValue(false)
-                                AutoClaimFarm:SetValue(false)
-                                AutoCutTreesToggle:SetValue(false)
-                                BuyFarm:SetValue(false)
+                                if not playerData then 
+                                    return 
+                                end
 
                                 local highestMap = 0
                                 if playerData.maps then
@@ -2961,248 +2961,33 @@ BuildUI = function()
                                 
                                 local nextMapNumber = highestMap + 1
                                 local nextMap = Maps[nextMapNumber]
+
                                 
+                                local incompleteQuests = {}
                                 local allQuestsCompleted = true
                                 
                                 if nextMap and nextMap.quests then
+                                    
                                     for questIndex, questData in pairs(nextMap.quests) do
                                         if not _G.MapQuestEnabled then return end
                                         
                                         local currentProgress = playerData.mapQuests[questIndex] or 0
-                                        if currentProgress >= questData.amount then
-                                            continue
-                                        else
-                                            allQuestsCompleted = false
-                                        end
-                                        
-                                        -- From here, we are only processing the CURRENT UNFINISHED quest
                                         local questType = questData.quest
                                         local required = questData.amount
                                         local questName = questData.name
-
-                                        if questType == "rebirths" then
-                                            local currentRebirths = playerData.rebirths or 0
-                                            local rebirthsNeeded = required - currentRebirths
-
-                                            if rebirthsNeeded > 1e98 then -- 1DTG threshold (adjust if needed)
-                                                -- Equip fixed 150B rebirths
-                                                for _, option in ipairs(rebirthOptions) do
-                                                    if option.amount == 150e9 then
-                                                        rebirthDropdown:SetValue(option.display)
-                                                        break
-                                                    end
-                                                end
-
-                                                AutoRebirth:SetValue(true)
-
-                                                -- Fire the server request every 3 seconds
-                                                task.spawn(function()
-                                                    local Knit = require(game:GetService("ReplicatedStorage").Packages.Knit)
-                                                    local MapService = Knit.GetService("MapService")
-                                                    while _G.MapQuestEnabled and rebirthsNeeded > 1e12 do
-                                                        pcall(function()
-                                                            MapService:purchaseSpaceWorld()
-                                                        end)
-                                                        task.wait(3)
-                                                    end
-                                                end)
-
-                                            else
-                                                -- Normal rebirth handling (existing logic)
-                                                local bestOptionDisplay = nil
-                                                if rebirthsNeeded > 0 then
-                                                    for _, option in ipairs(rebirthOptions) do
-                                                        if option.amount >= rebirthsNeeded then
-                                                            bestOptionDisplay = option.display
-                                                            break
-                                                        end
-                                                    end
-                                                end
-                                                if bestOptionDisplay then
-                                                    rebirthDropdown:SetValue(bestOptionDisplay)
-                                                else
-                                                    rebirthDropdown:SetValue("Max Unlocked")
-                                                end
-                                                AutoRebirth:SetValue(true)
-                                            end 
-
-                                        elseif questType == "openEgg" and questName then
-                                            local targetEggName = questName
-                                            for _, eggOption in ipairs(eggOptions) do
-                                                if eggOption:lower():find(targetEggName:lower()) then
-                                                    EggDropdown:SetValue(eggOption)
-                                                    break
-                                                end
-                                            end
-                                            HatchAmount:SetValue("Max")
-                                            AutoHatch:SetValue(true)
-
-                                        elseif questType == "craftAnyGalaxyPets" then
-                                            local previousMapNumber = nextMapNumber - 1
-                                            local previousMap = Maps[previousMapNumber]
-                                            local previousWorldEggName = (previousMap and previousMap.name) or nextMap.name
-                                            
-                                            for _, eggOption in ipairs(eggOptions) do
-                                                if eggOption:lower():find(previousWorldEggName:lower()) then
-                                                    EggDropdown:SetValue(eggOption)
-                                                    break
-                                                end
-                                            end
-                                            
-                                            HatchAmount:SetValue("Max")
-                                            AutoHatch:SetValue(true)
-                                            
-                                            task.wait(2)
-                                            PetDropdown:SetValues(getPlayerPetOptions())
-                                            local playerPetOptions = getPlayerPetOptions()
-                                            local galaxyCraftablePets = {}
-                                            
-                                            local Eggs = require(ReplicatedStorage.Shared.List.Pets.Eggs)
-                                            local previousEggData = Eggs[previousWorldEggName]
-                                            local previousWorldPetNames = {}
-                                            if previousEggData and previousEggData.pets then
-                                                for petName, _ in pairs(previousEggData.pets) do table.insert(previousWorldPetNames, petName) end
-                                            end
-                                            
-                                            for _, displayName in ipairs(playerPetOptions) do
-                                                for _, worldPetName in ipairs(previousWorldPetNames) do
-                                                    if displayName:find(worldPetName) then
-                                                        galaxyCraftablePets[displayName] = true
-                                                        break
-                                                    end
-                                                end
-                                            end
-
-                                            local toxicPetNames = {}
-                                            if playerData.maps then
-                                                for mapNumber, _ in pairs(playerData.maps) do
-                                                    local mapNum = tonumber(mapNumber)
-                                                    if mapNum and mapNum >= 17 then
-                                                        local mapData = Maps[mapNum]
-                                                        if mapData and mapData.name then
-                                                            local worldEggData = Eggs[mapData.name]
-                                                            if worldEggData and worldEggData.pets then
-                                                                for petName, chance in pairs(worldEggData.pets) do
-                                                                    if chance > 0.01 then table.insert(toxicPetNames, petName) end
-                                                                end
-                                                            end
-                                                        end
-                                                    end
-                                                end
-                                            end
-
-                                            for _, displayName in ipairs(playerPetOptions) do
-                                                for _, toxicPetName in ipairs(toxicPetNames) do
-                                                    if displayName:find("Toxic") and displayName:find(toxicPetName) then
-                                                        galaxyCraftablePets[displayName] = true
-                                                        break
-                                                    end
-                                                end
-                                            end
-                                            
-                                            if next(galaxyCraftablePets) and PetDropdown then
-                                                PetDropdown:SetValue(galaxyCraftablePets)
-                                                CraftAllToggle:SetValue(true)
-                                            end
-                                            
-                                        elseif questType == "hatchPet" and questName then
-                                            local previousMapNumber = nextMapNumber - 1
-                                            local previousMap = Maps[previousMapNumber]
-                                            local worldName = (previousMap and previousMap.name) or "Spawn"
-                                            
-                                            for _, eggOption in ipairs(eggOptions) do
-                                                if eggOption:lower():find(worldName:lower()) then
-                                                    EggDropdown:SetValue(eggOption)
-                                                    break
-                                                end
-                                            end
-                                            
-                                            HatchAmount:SetValue("Max")
-                                            AutoHatch:SetValue(true)
-                
-                                        elseif questType == "useAuraDice" then
-                                            local bestDiceId, maxAmount = nil, 0
-                                            if playerData.inventory and playerData.inventory.auraDice then
-                                                for itemId, itemData in pairs(playerData.inventory.auraDice) do
-                                                    if (itemData.am or 0) > maxAmount then
-                                                        maxAmount = itemData.am
-                                                        bestDiceId = itemData.nm or itemId
-                                                    end
-                                                end
-                                            end
-                                            if bestDiceId and maxAmount > 0 then
-                                                pcall(function() AuraService:roll(bestDiceId) end)
-                                                task.wait(2)
-                                            end
-                                            
-                                        elseif questType == "collectFruits" then
-                                            rebirthDropdown:SetValue("Max Unlocked")
-                                            AutoRebirth:SetValue(true)
-                                            
-                                            local allFarms = {}
-                                            for _, farmName in ipairs(farmOptions) do allFarms[farmName] = true end
-                                            farmDropdown:SetValue(allFarms)
-                                            BuyFarm:SetValue(true)
-                                            
-                                            local allClaimFarms = {}
-                                            for _, farmName in ipairs(claimFarmOptions) do allClaimFarms[farmName] = true end
-                                            claimDropdown:SetValue(allClaimFarms)
-                                            AutoClaimFarm:SetValue(true)
                                         
-                                        elseif questType == "building" and questName and (questName:lower():find("bridge") or questName:lower():find("wooden")) then
-                                                
-                                                local bridgeOptionName = "Wooden Bridge"
-                                                local foundOption = false
-                                                for _, option in ipairs(autoCraftDropdown.Values) do
-                                                    if option == bridgeOptionName then
-                                                        foundOption = true
-                                                        break
-                                                    end
-                                                end
-
-                                                if foundOption then
-                                                    autoCraftDropdown:SetValue({[bridgeOptionName] = true})
-                                                    AutoCraftBuildings:SetValue(true)
-                                                else
-                                                end
-                                                
-                                        elseif questType == "usePotions" then
-                                            local bestPotionId, maxAmount = nil, 0
-                                            if playerData.inventory and playerData.inventory.potion then
-                                                for itemId, itemData in pairs(playerData.inventory.potion) do
-                                                    if (itemData.am or 0) > maxAmount and not (itemData.nm or ""):lower():find("mega") then
-                                                        maxAmount = itemData.am
-                                                        bestPotionId = itemId
-                                                    end
-                                                end
-                                            end
-                                            if bestPotionId and maxAmount > 0 then
-                                                local potionsNeeded = math.min(required - currentProgress, maxAmount)
-                                                if potionsNeeded > 0 then
-                                                    pcall(function() Knit.GetService("InventoryService"):useItem(bestPotionId, {use = potionsNeeded}) end)
-                                                    task.wait(2)
-                                                end
-                                            end
-                                            
-                                        elseif questType == "useMegaPotions" then
-                                            local bestMegaPotionId, maxAmount = nil, 0
-                                            if playerData.inventory and playerData.inventory.potion then
-                                                for itemId, itemData in pairs(playerData.inventory.potion) do
-                                                    if (itemData.am or 0) > maxAmount and (itemData.nm or ""):lower():find("mega") then
-                                                        maxAmount = itemData.am
-                                                        bestMegaPotionId = itemId
-                                                    end
-                                                end
-                                            end
-                                            if bestMegaPotionId and maxAmount > 0 then
-                                                local megaPotionsNeeded = math.min(required - currentProgress, maxAmount)
-                                                if megaPotionsNeeded > 0 then
-                                                    pcall(function() Knit.GetService("InventoryService"):useItem(bestMegaPotionId, {use = megaPotionsNeeded}) end)
-                                                    task.wait(2)
-                                                end
-                                            end
+                                        if currentProgress >= required then
+                                            continue
+                                        else
+                                            allQuestsCompleted = false
+                                            table.insert(incompleteQuests, {
+                                                index = questIndex,
+                                                type = questType,
+                                                name = questName,
+                                                required = required,
+                                                current = currentProgress
+                                            })
                                         end
-                                        break
                                     end
                                 else
                                     allQuestsCompleted = true
@@ -3213,13 +2998,300 @@ BuildUI = function()
                                     _G.MapQuestEnabled = false
                                     return
                                 end
+                                
+                                
+                                -- Track which systems should be active
+                                local shouldAutoRebirth = false
+                                local shouldAutoHatch = false
+                                local shouldCraftAll = false
+                                local shouldAutoClaimFarm = false
+                                local shouldBuyFarm = false
+                                local shouldAutoCraftBuildings = false
+                                
+                                local eggToHatch = nil
+                                local rebirthAmount = nil
+                                local petsToSelect = {}
+                                local farmsToSelect = {}
+                                local claimFarmsToSelect = {}
+                                local buildingsToSelect = {}
+                                
+                                for _, quest in ipairs(incompleteQuests) do
+                                    local questType = quest.type
+                                    local questName = quest.name
+                                    local required = quest.required
+                                    local currentProgress = quest.current
+                                    
+                                    
+                                    if questType == "rebirths" then
+                                        local currentRebirths = playerData.rebirths or 0
+                                        local rebirthsNeeded = required - currentRebirths
+
+                                        if rebirthsNeeded > 1e98 then
+                                            for _, option in ipairs(rebirthOptions) do
+                                                if option.amount == 150e9 then
+                                                    rebirthAmount = option.display
+                                                    break
+                                                end
+                                            end
+                                            shouldAutoRebirth = true
+
+                                            if not spaceWorldPurchaseActive then
+                                                spaceWorldPurchaseActive = true
+                                                task.spawn(function()
+                                                    local Knit = require(game:GetService("ReplicatedStorage").Packages.Knit)
+                                                    local MapService = Knit.GetService("MapService")
+                                                    while _G.MapQuestEnabled and spaceWorldPurchaseActive do
+                                                        pcall(function()
+                                                            MapService:purchaseSpaceWorld()
+                                                        end)
+                                                        task.wait(3)
+                                                    end
+                                                end)
+                                            end
+                                        else
+                                            local bestOptionDisplay = nil
+                                            if rebirthsNeeded > 0 then
+                                                for _, option in ipairs(rebirthOptions) do
+                                                    if option.amount >= rebirthsNeeded then
+                                                        bestOptionDisplay = option.display
+                                                        break
+                                                    end
+                                                end
+                                            end
+                                            rebirthAmount = bestOptionDisplay or "Max Unlocked"
+                                            shouldAutoRebirth = true
+                                            spaceWorldPurchaseActive = false
+                                        end
+
+                                    elseif questType == "openEgg" and questName then
+                                        for _, eggOption in ipairs(eggOptions) do
+                                            if eggOption:lower():find(questName:lower()) then
+                                                eggToHatch = eggOption
+                                                shouldAutoHatch = true
+                                                break
+                                            end
+                                        end
+
+                                    elseif questType == "craftAnyGalaxyPets" then
+                                        local previousMapNumber = nextMapNumber - 1
+                                        local previousMap = Maps[previousMapNumber]
+                                        local previousWorldEggName = (previousMap and previousMap.name) or nextMap.name
+                                        
+                                        for _, eggOption in ipairs(eggOptions) do
+                                            if eggOption:lower():find(previousWorldEggName:lower()) then
+                                                eggToHatch = eggOption
+                                                shouldAutoHatch = true
+                                                break
+                                            end
+                                        end
+                                        
+                                        PetDropdown:SetValues(getPlayerPetOptions())
+                                        local playerPetOptions = getPlayerPetOptions()
+                                        local galaxyCraftablePets = {}
+                                        
+                                        local Eggs = require(ReplicatedStorage.Shared.List.Pets.Eggs)
+                                        local previousEggData = Eggs[previousWorldEggName]
+                                        local previousWorldPetNames = {}
+                                        if previousEggData and previousEggData.pets then
+                                            for petName, _ in pairs(previousEggData.pets) do 
+                                                table.insert(previousWorldPetNames, petName) 
+                                            end
+                                        end
+                                        
+                                        for _, displayName in ipairs(playerPetOptions) do
+                                            for _, worldPetName in ipairs(previousWorldPetNames) do
+                                                if displayName:find(worldPetName) then
+                                                    galaxyCraftablePets[displayName] = true
+                                                    petsToSelect[displayName] = true
+                                                    break
+                                                end
+                                            end
+                                        end
+
+                                        local toxicPetNames = {}
+                                        if playerData.maps then
+                                            for mapNumber, _ in pairs(playerData.maps) do
+                                                local mapNum = tonumber(mapNumber)
+                                                if mapNum and mapNum >= 17 then
+                                                    local mapData = Maps[mapNum]
+                                                    if mapData and mapData.name then
+                                                        local worldEggData = Eggs[mapData.name]
+                                                        if worldEggData and worldEggData.pets then
+                                                            for petName, chance in pairs(worldEggData.pets) do
+                                                                if chance > 0.01 then 
+                                                                    table.insert(toxicPetNames, petName) 
+                                                                end
+                                                            end
+                                                        end
+                                                    end
+                                                end
+                                            end
+                                        end
+
+                                        for _, displayName in ipairs(playerPetOptions) do
+                                            for _, toxicPetName in ipairs(toxicPetNames) do
+                                                if displayName:find("Toxic") and displayName:find(toxicPetName) then
+                                                    galaxyCraftablePets[displayName] = true
+                                                    petsToSelect[displayName] = true
+                                                    break
+                                                end
+                                            end
+                                        end
+                                        
+                                        if next(petsToSelect) then
+                                            shouldCraftAll = true
+                                        end
+                                        
+                                    elseif questType == "hatchPet" and questName then
+                                        local previousMapNumber = nextMapNumber - 1
+                                        local previousMap = Maps[previousMapNumber]
+                                        local worldName = (previousMap and previousMap.name) or "Spawn"
+                                        
+                                        for _, eggOption in ipairs(eggOptions) do
+                                            if eggOption:lower():find(worldName:lower()) then
+                                                eggToHatch = eggOption
+                                                shouldAutoHatch = true
+                                                break
+                                            end
+                                        end
+            
+                                    elseif questType == "useAuraDice" then
+                                        local bestDiceId, maxAmount = nil, 0
+                                        if playerData.inventory and playerData.inventory.auraDice then
+                                            for itemId, itemData in pairs(playerData.inventory.auraDice) do
+                                                if (itemData.am or 0) > maxAmount then
+                                                    maxAmount = itemData.am
+                                                    bestDiceId = itemData.nm or itemId
+                                                end
+                                            end
+                                        end
+                                        if bestDiceId and maxAmount > 0 then
+                                            pcall(function() AuraService:roll(bestDiceId) end)
+                                        end
+                                        
+                                    elseif questType == "collectFruits" then
+                                        rebirthAmount = "Max Unlocked"
+                                        shouldAutoRebirth = true
+                                        
+                                        for _, farmName in ipairs(farmOptions) do 
+                                            farmsToSelect[farmName] = true 
+                                        end
+                                        shouldBuyFarm = true
+                                        
+                                        for _, farmName in ipairs(claimFarmOptions) do 
+                                            claimFarmsToSelect[farmName] = true 
+                                        end
+                                        shouldAutoClaimFarm = true
+                                    
+                                    elseif questType == "building" and questName and (questName:lower():find("bridge") or questName:lower():find("wooden")) then
+                                        local bridgeOptionName = "Wooden Bridge"
+                                        local foundOption = false
+                                        for _, option in ipairs(autoCraftDropdown.Values) do
+                                            if option == bridgeOptionName then
+                                                foundOption = true
+                                                break
+                                            end
+                                        end
+
+                                        if foundOption then
+                                            buildingsToSelect[bridgeOptionName] = true
+                                            shouldAutoCraftBuildings = true
+                                        end
+                                        
+                                    elseif questType == "usePotions" then
+                                        local bestPotionId, maxAmount = nil, 0
+                                        if playerData.inventory and playerData.inventory.potion then
+                                            for itemId, itemData in pairs(playerData.inventory.potion) do
+                                                if (itemData.am or 0) > maxAmount and not (itemData.nm or ""):lower():find("mega") then
+                                                    maxAmount = itemData.am
+                                                    bestPotionId = itemId
+                                                end
+                                            end
+                                        end
+                                        if bestPotionId and maxAmount > 0 then
+                                            local potionsNeeded = math.min(required - currentProgress, maxAmount)
+                                            if potionsNeeded > 0 then
+                                                pcall(function() 
+                                                    Knit.GetService("InventoryService"):useItem(bestPotionId, {use = potionsNeeded}) 
+                                                end)
+                                            end
+                                        end
+                                        
+                                    elseif questType == "useMegaPotions" then
+                                        local bestMegaPotionId, maxAmount = nil, 0
+                                        if playerData.inventory and playerData.inventory.potion then
+                                            for itemId, itemData in pairs(playerData.inventory.potion) do
+                                                if (itemData.am or 0) > maxAmount and (itemData.nm or ""):lower():find("mega") then
+                                                    maxAmount = itemData.am
+                                                    bestMegaPotionId = itemId
+                                                end
+                                            end
+                                        end
+                                        if bestMegaPotionId and maxAmount > 0 then
+                                            local megaPotionsNeeded = math.min(required - currentProgress, maxAmount)
+                                            if megaPotionsNeeded > 0 then
+                                                pcall(function() 
+                                                    Knit.GetService("InventoryService"):useItem(bestMegaPotionId, {use = megaPotionsNeeded}) 
+                                                end)
+                                            end
+                                        end
+                                    end
+                                end
+
+                                
+                                if shouldAutoRebirth and rebirthAmount then
+                                    rebirthDropdown:SetValue(rebirthAmount)
+                                    AutoRebirth:SetValue(true)
+                                else
+                                    AutoRebirth:SetValue(false)
+                                end
+                                
+                                if shouldAutoHatch and eggToHatch then
+                                    EggDropdown:SetValue(eggToHatch)
+                                    HatchAmount:SetValue("Max")
+                                    AutoHatch:SetValue(true)
+                                else
+                                    AutoHatch:SetValue(false)
+                                end
+                                
+                                if shouldCraftAll and next(petsToSelect) then
+                                    PetDropdown:SetValue(petsToSelect)
+                                    CraftAllToggle:SetValue(true)
+                                else
+                                    CraftAllToggle:SetValue(false)
+                                end
+                                
+                                if shouldAutoClaimFarm and next(claimFarmsToSelect) then
+                                    claimDropdown:SetValue(claimFarmsToSelect)
+                                    AutoClaimFarm:SetValue(true)
+                                else
+                                    AutoClaimFarm:SetValue(false)
+                                end
+                                
+                                if shouldBuyFarm and next(farmsToSelect) then
+                                    farmDropdown:SetValue(farmsToSelect)
+                                    BuyFarm:SetValue(true)
+                                else
+                                    BuyFarm:SetValue(false)
+                                end
+                                
+                                if shouldAutoCraftBuildings and next(buildingsToSelect) then
+                                    autoCraftDropdown:SetValue(buildingsToSelect)
+                                    AutoCraftBuildings:SetValue(true)
+                                else
+                                    AutoCraftBuildings:SetValue(false)
+                                end
+                                
+                                -- Disable unused systems
+                                AutoCutTreesToggle:SetValue(false)
                             end)
                             
-                            if not success then end
+                            if not success then 
+                            end
                             if not _G.MapQuestEnabled then break end
-                            task.wait(3)
+                            
+                            task.wait(5)
                         end
-                        
                         restoreOriginalStates()
                     end)
                 else
