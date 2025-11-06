@@ -71,7 +71,7 @@ BuildUI = function()
         Title = "Load the Halloween Event Script",
         Description = "Loads my Halloween Event script",
         Callback = function()
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/bigbeanscripts/RCU./refs/heads/main/Halloween"))()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/BigBeanLUA/RCU/refs/heads/main/Event"))()
         end
     })
 
@@ -1729,7 +1729,7 @@ BuildUI = function()
         Title = "Load Script",
         Description = "Sorry for the separate loadstring! Having such a large script was causing me to run out of local uses and creating lag issues.",
         Callback = function()
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/bigbeanscripts/RCU-machine/refs/heads/main/RCU."))()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/BigBeanLUA/RCU/refs/heads/main/Machine"))()
         end
     })
 
