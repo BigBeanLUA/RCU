@@ -78,19 +78,22 @@ BuildUI = function()
 
     local ClickSection = Tabs.Main:AddSection("Auto Click")
 
+    local ClickController = require(game:GetService("Players").LocalPlayer.PlayerScripts.Client.Controllers.ClickController)
     local isMainAutoClicking = false 
     
     local AutoClick = ClickSection:Toggle("AutoClick", {
         Title = "Auto Click",
-        Description = "Automatically clicks for you - Extremely fast!",
+        Description = "This might be detected, so use this carefully!",
         Default = false,
         Callback = function(Value)
-            isMainAutoClicking = Value 
+            isMainAutoClicking = Value
             if Value then
                 task.spawn(function()
-                    while isMainAutoClicking do 
-                        ClickService.click._re:FireServer()
-                        task.wait(0.05)
+                    while isMainAutoClicking do
+                        ClickController:setLastClickType(2) 
+                        ClickController:setDebounce()
+                        ClickController:doClick()
+                        task.wait(0.02)
                     end
                 end)
             end
