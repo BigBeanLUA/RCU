@@ -1752,6 +1752,23 @@ BuildUI = function()
         end
     end)
 
+
+    task.spawn(function()
+        local Knit = require(game:GetService("ReplicatedStorage").Packages.Knit)
+        local DungeonController = Knit.GetController("DungeonController")
+        
+        -- Store original spawnBoss function
+        local originalSpawnBoss = DungeonController.spawnBoss
+        
+        -- Override with error-safe version
+        DungeonController.spawnBoss = function(...)
+            local success, err = pcall(originalSpawnBoss, ...)
+            if not success then
+                -- Silently catch the error - boss will spawn on next attempt
+            end
+        end
+    end)
+
     AutoCritDamageSection:Toggle("AutoCriticalTap", {
         Title = "Auto Critical Tap",
         Description = "You will always deal 1000x damage. Incredibly overpowered.",
@@ -1763,10 +1780,14 @@ BuildUI = function()
                 task.spawn(function()
                     while autoCriticalTapEnabled do
                         if inDungeon then
-                            pcall(function()
-                                DungeonService.damage._re:FireServer()
-                                DungeonService.criticalTap._re:FireServer()
-                            end)
+                            -- Check if a boss exists before firing
+                            local dungeonBosses = CollectionService:GetTagged("dungeonBoss")
+                            if #dungeonBosses > 0 then
+                                pcall(function()
+                                    DungeonService.damage._re:FireServer()
+                                    DungeonService.criticalTap._re:FireServer()
+                                end)
+                            end
                         end
                         task.wait(0.15)
                     end
@@ -3411,15 +3432,15 @@ BuildUI = function()
 
     findBestPotion = function()
         local playerData = DataController:getData()
-        if not playerData or not playerData.inventory or not playerData.inventory.exclusive then
+        if not playerData or not playerData.inventory or not playerData.inventory.potion then
             return nil
         end
         
         local bestPotion = nil
         local highestAmount = 0
         
-        for itemId, itemData in pairs(playerData.inventory.exclusive) do
-            if itemData.nm and itemData.nm:lower():find("potion") and itemData.am and itemData.am > highestAmount then
+        for itemId, itemData in pairs(playerData.inventory.potion) do
+            if itemData.am and itemData.am > highestAmount then
                 highestAmount = itemData.am
                 bestPotion = itemId
             end
