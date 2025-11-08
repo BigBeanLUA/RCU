@@ -2927,6 +2927,17 @@ BuildUI = function()
                         AutoClick:SetValue(true)
                     end
 
+                    task.spawn(function()
+                        while _G.MapQuestEnabled do
+                            task.wait(10)
+                            if _G.MapQuestEnabled then
+                                _G.MapQuestEnabled = false
+                                task.wait(0.5)
+                                _G.MapQuestEnabled = true
+                            end
+                        end
+                    end)
+
                     -- Track active quest handlers
                     local activeQuestHandlers = {}
                     local spaceWorldPurchaseActive = false
@@ -3021,7 +3032,7 @@ BuildUI = function()
 
                                         if rebirthsNeeded > 1e98 then
                                             for _, option in ipairs(rebirthOptions) do
-                                                if option.amount == 150e9 then
+                                                if option.amount == 1e12 then
                                                     rebirthAmount = option.display
                                                     break
                                                 end
@@ -4856,7 +4867,6 @@ task.spawn(function()
 
     Tabs = {
         Settings = Window:AddTab({ Title = "Settings", Icon = "settings" }),
-        Event = Window:AddTab({ Title = "Event", Icon = "ghost" }),
         Main = Window:AddTab({ Title = "Auto Farm", Icon = "crown" }),
         Eggs = Window:AddTab({ Title = "Eggs", Icon = "egg" }),
         Tree = Window:AddTab({ Title = "Axe/Tree", Icon = "phosphor-tree-evergreen-duotone" }),
