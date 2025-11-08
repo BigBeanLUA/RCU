@@ -65,16 +65,6 @@ end)
 
 BuildUI = function()
 
-    local EventSection = Tabs.Event:AddSection("Halloween Event")
-
-    EventSection:AddButton({
-        Title = "Load the Halloween Event Script",
-        Description = "Loads my Halloween Event script",
-        Callback = function()
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/BigBeanLUA/RCU/refs/heads/main/Event"))()
-        end
-    })
-
 
     local ClickSection = Tabs.Main:AddSection("Auto Click")
 
