@@ -1180,6 +1180,7 @@ BuildUI = function()
         Callback = function(enabled)
             if enabled then
                 isAutoUpgradeEnabled = true
+                AutoEquip:SetValue(true)
 
                 originalSelectedObjects = {}
                 for treeObject, isSelected in pairs(SelectTreesDropdown.Value) do
@@ -4629,7 +4630,7 @@ BuildUI = function()
         end
     })
     
-local PetArchiverSection = Tabs.Misc:AddSection("Pet Archiver")
+    local PetArchiverSection = Tabs.Misc:AddSection("Pet Archiver")
 
     local petsToKeepInput = PetArchiverSection:AddInput("PetsToKeepInput", {
         Title = "Number of best Pets to KEEP",
@@ -4720,6 +4721,50 @@ local PetArchiverSection = Tabs.Misc:AddSection("Pet Archiver")
             end
         end
     })
+
+    local PetsSection = Tabs.Misc:AddSection("Pets")
+
+    local AutoEquipBestPets = false
+    local autoEquipThread
+
+    PetsSection:Toggle("AutoEquipBestPets", {
+        Title = "Auto Equip Best Pets",
+        Default = false,
+        Callback = function(enabled)
+            AutoEquipBestPets = enabled
+
+            -- stop existing thread
+            if autoEquipThread then
+                task.cancel(autoEquipThread)
+                autoEquipThread = nil
+            end
+
+            if enabled then
+                autoEquipThread = task.spawn(function()
+                    while AutoEquipBestPets do
+                        pcall(function()
+                            -- Re-fetch the button each loop (in case the UI reloads)
+                            local button = player.PlayerGui:FindFirstChild("MainUI", true)
+                            if not button then return end
+                            button = button:FindFirstChild("EquipBest", true)
+                            if not button then return end
+                            local click = button:FindFirstChild("Click") or button
+
+                            -- Fire MouseButton1Down/Up events
+                            for _, connection in pairs(getconnections(click.MouseButton1Down)) do
+                                connection:Fire()
+                            end
+                            for _, connection in pairs(getconnections(click.MouseButton1Up)) do
+                                connection:Fire()
+                            end
+                        end)
+                        task.wait(5)
+                    end
+                end)
+            end
+        end
+    })
+
     EventSection = Tabs.Misc:AddSection("Events")
     isAutoBreakingMeteors = false
     EventSection:Toggle("AutoBreakMeteors", { Title = "Auto Break Meteors (Infinite Range)", Default = false,
