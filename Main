@@ -179,12 +179,12 @@ BuildUI = function()
         end
     })
 
-    -- CORRECTED: This task now runs only ONCE to populate the dropdown.
     task.spawn(function()
         DataController:waitForData()
-        task.wait(2) -- Wait for data to be stable before the initial population.
-        pcall(updateRebirthDropdown) -- Call it once and then the task ends.
+        task.wait(2)
+        pcall(updateRebirthDropdown)
     end)
+
     local UpgradesSection = Tabs.Main:AddSection("Player Upgrades")
     local ActiveThreads = {}
 
@@ -2894,7 +2894,7 @@ BuildUI = function()
     end)
 
     -- Toggle in GUI
-    MapQuestSection:Toggle("AutoCompleteMapQuest", {
+    local MapQuestToggle = MapQuestSection:Toggle("AutoCompleteMapQuest", {
         Title = "Auto Complete Map Quest",
         Description = "Automatically completes map quests and unlocks walls sequentially.",
         Default = false,
@@ -3328,6 +3328,19 @@ BuildUI = function()
         end
     })
     
+    task.spawn(function()
+    while true do
+        if MapQuestToggle.Value then
+            MapQuestToggle:SetValue(false)
+            task.wait(0.2)
+            MapQuestToggle:SetValue(true)
+            task.wait(0.2)
+            MapQuestToggle:SetValue(true)
+        end
+        task.wait(10)
+    end
+end)
+
     local MapQuestNone = MapQuestSection:Paragraph("MapQuestNone", {
         Title = "Note",
         Content = "For the build quest in the kingdom world, the bridge will be built, but this script won't source the resources. Make sure you have at least 3 ancient ticks, 3 fire aura dice, 5 grapes, and 5 apples.",
@@ -4760,31 +4773,41 @@ BuildUI = function()
                 autoEquipThread = nil
             end
 
+            -- helper function for clicking Equip Best
+            local function equipBest()
+                pcall(function()
+                    local button = player.PlayerGui:FindFirstChild("MainUI", true)
+                    if not button then return end
+
+                    button = button:FindFirstChild("EquipBest", true)
+                    if not button then return end
+
+                    local click = button:FindFirstChild("Click") or button
+
+                    for _, connection in pairs(getconnections(click.MouseButton1Down)) do
+                        connection:Fire()
+                    end
+                    for _, connection in pairs(getconnections(click.MouseButton1Up)) do
+                        connection:Fire()
+                    end
+                end)
+            end
+
             if enabled then
+                -- RUN ONCE INSTANTLY
+                equipBest()
+
+                -- START LOOP
                 autoEquipThread = task.spawn(function()
                     while AutoEquipBestPets do
-                        pcall(function()
-                            -- Re-fetch the button each loop (in case the UI reloads)
-                            local button = player.PlayerGui:FindFirstChild("MainUI", true)
-                            if not button then return end
-                            button = button:FindFirstChild("EquipBest", true)
-                            if not button then return end
-                            local click = button:FindFirstChild("Click") or button
-
-                            -- Fire MouseButton1Down/Up events
-                            for _, connection in pairs(getconnections(click.MouseButton1Down)) do
-                                connection:Fire()
-                            end
-                            for _, connection in pairs(getconnections(click.MouseButton1Up)) do
-                                connection:Fire()
-                            end
-                        end)
+                        equipBest()
                         task.wait(5)
                     end
                 end)
             end
         end
     })
+
 
     EventSection = Tabs.Misc:AddSection("Events")
     isAutoBreakingMeteors = false
