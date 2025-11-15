@@ -174,18 +174,8 @@ BuildUI = function()
     })
 
     local AutoRebirth = RebirthSection:Toggle("AutoRebirth", {
-    Title = "Auto Rebirth", Default = false,
-    Callback = function(Value)
-        autoRebirthRunning = Value
-        if Value then
-            task.spawn(function()
-                while autoRebirthRunning do
-                    pcall(performRebirth)
-                    task.wait(0.2)
-                end
-            end)
-        end
-    end})
+    Title = "Auto Rebirth", Default = false
+    })
 
 
     pcall(updateRebirthDropdown)
@@ -197,35 +187,38 @@ BuildUI = function()
     TitleAlignment = "Middle"
     })
 
-    task.spawn(function()
-        local autoRebirthThread = nil
-
-        AutoRebirth:OnChanged(function(Value)
-            autoRebirthRunning = Value
-            if autoRebirthThread then
-                task.cancel(autoRebirthThread)
-                autoRebirthThread = nil
-            end
-            if Value then
-                autoRebirthThread = task.spawn(function()
-                    while autoRebirthRunning do
-                        local delay = tonumber(rebirthDelayInput.Value)
-                        if not delay or delay == 0 then
-                            local result = pcall(performRebirth)
-                            task.wait(0.2)
-                        else
-                            local bestOption = GetBestRebirthOption()
-                            if bestOption then
-                                local result = pcall(function() RebirthService:rebirth(bestOption) end)
-                            end
-                            task.wait(delay)
+    AutoRebirth:OnChanged(function(Value)
+        autoRebirthRunning = Value
+        if autoRebirthThread then
+            task.cancel(autoRebirthThread)
+            autoRebirthThread = nil
+        end
+        if Value then
+            autoRebirthThread = task.spawn(function()
+                while autoRebirthRunning do
+                    local delay = tonumber(rebirthDelayInput.Value)
+                    print("[AutoRebirth] Delay input:", delay)
+                    if not delay or delay == 0 then
+                        print("[AutoRebirth] Using default fast rebirth (0.2s)")
+                        local result = pcall(performRebirth)
+                        print("[AutoRebirth] performRebirth result:", result)
+                        task.wait(0.2)
+                    else
+                        print("[AutoRebirth] Waiting for", delay, "seconds before rebirth")
+                        task.wait(delay)
+                        local bestOption = GetBestRebirthOption()
+                        print("[AutoRebirth] Best option after delay:", bestOption)
+                        if bestOption then
+                            local result = pcall(function() RebirthService:rebirth(bestOption) end)
+                            print("[AutoRebirth] rebirth result:", result)
                         end
+                        task.wait(0.1)
                     end
-                end)
-            end
-        end)
+                end
+            end)
+        end
     end)
-    
+        
 
 
     local UpgradesSection = Tabs.Main:AddSection("Player Upgrades")
