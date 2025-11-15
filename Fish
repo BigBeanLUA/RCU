@@ -86,7 +86,7 @@ BuildUI = function()
     
     local AutoFish = AutoFishSection:Toggle("AutoFish", {
         Title = "Auto Fish",
-        Description = "Automatically catches and requests fish.",
+        Description = "Automatically catches fish.. pretty OP and fast.",
         Default = false,
         Callback = function(state)
             autoFishEnabled = state
@@ -448,7 +448,7 @@ BuildUI = function()
     local autoFishingUpgradeEnabled = false
     DungeonUpgrades:Toggle("AutoUpgrade", {
         Title = "Auto Upgrade",
-        Description = "Automatically buys selected fishing upgrades when you can afford them",
+        Description = "Automatically buys selected fishing upgrades when you can afford them.",
         Default = false,
         Callback = function(Value)
             autoFishingUpgradeEnabled = Value
@@ -571,7 +571,7 @@ BuildUI = function()
 
     FishIndexSection:Toggle("ClaimFishingRewards", {
         Title = "Claim Fishing Rewards",
-        Description = "Automatically claims available Fishing Index rewards every 5 seconds.",
+        Description = "Automatically claims available Fishing Index rewards.",
         Default = false,
         Callback = function(enabled)
             autoClaimFishdexRewards = enabled
@@ -593,7 +593,6 @@ BuildUI = function()
                                 local alreadyClaimed = table.find(claimed, index)
                                 local enoughCollected = collectedCount >= rewardData.required
                                 if not alreadyClaimed and enoughCollected then
-                                    print(string.format("[AutoClaim] Claiming Fishdex reward index %s (requires %d, you have %d)", tostring(index), rewardData.required, collectedCount))
                                     local KnitClient = require(game:GetService("ReplicatedStorage").Packages.Knit.KnitClient)
                                     KnitClient.GetService("FishingService"):claimFishdexdexReward(index)
                                     task.wait(0.5)
@@ -606,7 +605,7 @@ BuildUI = function()
             end
         end
     })
-    
+
     SaveManager:SetLibrary(Library)
     InterfaceManager:SetLibrary(Library)
     SaveManager:IgnoreThemeSettings()
