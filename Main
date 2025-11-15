@@ -197,20 +197,14 @@ BuildUI = function()
             autoRebirthThread = task.spawn(function()
                 while autoRebirthRunning do
                     local delay = tonumber(rebirthDelayInput.Value)
-                    print("[AutoRebirth] Delay input:", delay)
                     if not delay or delay == 0 then
-                        print("[AutoRebirth] Using default fast rebirth (0.2s)")
                         local result = pcall(performRebirth)
-                        print("[AutoRebirth] performRebirth result:", result)
                         task.wait(0.2)
                     else
-                        print("[AutoRebirth] Waiting for", delay, "seconds before rebirth")
                         task.wait(delay)
                         local bestOption = GetBestRebirthOption()
-                        print("[AutoRebirth] Best option after delay:", bestOption)
                         if bestOption then
                             local result = pcall(function() RebirthService:rebirth(bestOption) end)
-                            print("[AutoRebirth] rebirth result:", result)
                         end
                         task.wait(0.1)
                     end
