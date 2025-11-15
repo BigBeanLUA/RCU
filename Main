@@ -284,6 +284,96 @@ BuildUI = function()
         end
     })
 
+    local SkillTreeSection = Tabs.Main:AddSection("Skill Tree")
+
+    local autoSkillTreeUpgradeEnabled = false
+
+    SkillTreeSection:Toggle("AutoUpgradeSkills", {
+        Title = "Auto Upgrade Skills",
+        Description = "Automatically buys all affordable skill tree upgrades you don't own.",
+        Default = false,
+        Callback = function(enabled)
+            autoSkillTreeUpgradeEnabled = enabled
+            if enabled then
+                task.spawn(function()
+                    local KnitClient = require(game:GetService("ReplicatedStorage").Packages.Knit.KnitClient)
+                    local SkillTreeService = KnitClient.GetService("SkillTreeService")
+                    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+                    local SkillTreeList = require(ReplicatedStorage.Shared.List.SkillTree)
+                    local DataController = Knit.GetController("DataController")
+
+                    while autoSkillTreeUpgradeEnabled do
+                        pcall(function()
+                            DataController:waitForData()
+                            local playerData = DataController:getData()
+
+                            -- Build currency lookup table
+                            local playerCurrencies = {}
+                            if playerData.inventory and playerData.inventory.currency then
+                                for _, currencyData in pairs(playerData.inventory.currency) do
+                                    playerCurrencies[currencyData.nm] = currencyData.am
+                                end
+                            end
+                            if playerData.dungeonCoins then
+                                playerCurrencies["dungeonCoins"] = playerData.dungeonCoins
+                            end
+                            if playerData.gems then
+                                playerCurrencies["gems"] = playerData.gems
+                            end
+                            if playerData.inventory and playerData.inventory.exclusive then
+                                for _, exclusiveData in pairs(playerData.inventory.exclusive) do
+                                    if exclusiveData.am then
+                                        playerCurrencies[exclusiveData.nm] = exclusiveData.am
+                                    end
+                                end
+                            end
+
+                            -- Loop through each category
+                            for categoryId, categoryData in pairs(SkillTreeList) do
+                                local upgradesName = tostring(categoryId)
+                                for subcategoryName, subcategoryData in pairs(categoryData.list) do
+                                    for index, upgradeData in ipairs(subcategoryData.list) do
+                                        local upgradeKey = subcategoryName .. "_" .. index
+                                        local isOwned = false
+                                        if playerData.skillTree and playerData.skillTree[categoryId] then
+                                            isOwned = playerData.skillTree[categoryId][upgradeKey] == true
+                                        end
+                                        if not isOwned then
+                                            -- Get price and currency
+                                            local price = upgradeData.price or 0
+                                            local currencyName = "gems"
+                                            if upgradeData.currency then
+                                                if upgradeData.currency == "dungeonCoins" then
+                                                    currencyName = "dungeonCoins"
+                                                elseif type(upgradeData.currency) == "table" then
+                                                    if type(upgradeData.currency.nm) == "string" then
+                                                        currencyName = upgradeData.currency.nm
+                                                    elseif type(upgradeData.currency.getRealName) == "function" then
+                                                        currencyName = upgradeData.currency:getRealName():lower():gsub(" ", "")
+                                                    end
+                                                elseif type(upgradeData.currency) == "string" then
+                                                    currencyName = upgradeData.currency
+                                                end
+                                            end
+                                            local playerCurrencyAmount = playerCurrencies[currencyName] or 0
+                                            if playerCurrencyAmount >= price then
+                                                -- Buy the upgrade
+                                                SkillTreeService:buySkillTree(upgradesName, subcategoryName, index)
+                                                task.wait(0.2)
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end)
+                        task.wait(5)
+                    end
+                end)
+            end
+        end
+    })
+    
+
     local EggHatchingSection = Tabs.Eggs:AddSection("Auto Hatch")
     local EggsModule = require(ReplicatedStorage.Shared.List.Pets.Eggs)
     local EggUtils = require(ReplicatedStorage.Shared.Util.EggUtils)
