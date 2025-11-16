@@ -3997,6 +3997,16 @@ end)
         end
     end)
 
+    minescript = Tabs.Mine:AddSection("Mining Script")
+    
+    minescript:Button({
+        Title = "Mine Script",
+        Description = "Sorry for the separate loadstring! Having such a large script was causing me to run out of local uses and creating lag issues.",
+        Callback = function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/BigBeanLUA/RCU/refs/heads/main/Mine"))()
+        end
+    })
+
 
     fishscript = Tabs.Fish:AddSection("Fishing Script")
     
@@ -5375,6 +5385,7 @@ task.spawn(function()
         Dunegon = Window:AddTab({ Title = "Dungeon", Icon = "phosphor-shield-checkered-bold" }),
         Craft = Window:AddTab({ Title = "Building", Icon = "hammer" }),
         Quest = Window:AddTab({ Title = "Quests", Icon = "phosphor-scroll-bold" }),
+        Mine = Window:AddTab({ Title = "Mining", Icon = "pickaxe" }),
         Fish = Window:AddTab({ Title = "Fishing", Icon = "fish" }),
         Claim = Window:AddTab({ Title = "Auto Claim/Collect", Icon = "gift" }),
         Misc = Window:AddTab({ Title = "Misc", Icon = "sparkles" }),
