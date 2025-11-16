@@ -191,7 +191,7 @@ BuildUI = function()
                     local CollectionService = game:GetService("CollectionService")
                     local Players = game:GetService("Players")
 
-                    -- Get pickaxe damage from ExclusiveItems
+
                     local function getPickaxeDamage()
                         local data = DataController:getData()
                         if data and data.inventory and data.inventory.exclusive then
@@ -202,13 +202,21 @@ BuildUI = function()
                                 if itemName:lower():find("pickaxe") then
                                     local pickaxeData = ExclusiveItems[itemName]
                                     if pickaxeData and pickaxeData.multiplier then
-                                        return pickaxeData.multiplier, pickaxeData.name or itemName
+                                        -- Get base pickaxe damage
+                                        local baseDamage = pickaxeData.multiplier
+                                        
+                                        -- Add player's pickaxeDamageMultiplier from data
+                                        local playerMultiplier = data.pickaxeDamageMultiplier or 0
+                                        local totalDamage = baseDamage + playerMultiplier
+                                        
+                                        return totalDamage, pickaxeData.name or itemName
                                     end
                                 end
                             end
                         end
                         return 10, "Wooden Pickaxe"
                     end
+
 
                     local maxHitsAllowed = 75
                     local maxUnbeatable20Percent = 20
@@ -978,7 +986,6 @@ BuildUI = function()
         local OreRooms = require(ReplicatedStorage.Shared.List.Mine.OreRooms)
         local ExclusiveItems = require(ReplicatedStorage.Shared.List.Items.Exclusive)
         
-        -- Get pickaxe damage
         local function getPickaxeDamage()
             local data = DataController:getData()
             if data and data.inventory and data.inventory.exclusive then
@@ -989,7 +996,10 @@ BuildUI = function()
                     if itemName:lower():find("pickaxe") then
                         local pickaxeData = ExclusiveItems[itemName]
                         if pickaxeData and pickaxeData.multiplier then
-                            return pickaxeData.multiplier, pickaxeData.name or itemName
+                            local baseDamage = pickaxeData.multiplier
+                            local playerMultiplier = data.pickaxeDamageMultiplier or 0
+                            local totalDamage = baseDamage + playerMultiplier
+                            return totalDamage, pickaxeData.name or itemName
                         end
                     end
                 end
@@ -998,7 +1008,7 @@ BuildUI = function()
         end
         
         local pickaxeDamage, pickaxeName = getPickaxeDamage()
-        local maxHits = 50
+        local maxHits = 75
         local maxHP = pickaxeDamage * maxHits
 
         
@@ -1014,7 +1024,7 @@ BuildUI = function()
                 if oreData.rewards then
                     for _, reward in ipairs(oreData.rewards) do
                         local rewardName = reward:getName() or ""
-                        if rewardName:lower():find("spacestones") or rewardName:lower():find("stone") then
+                        if rewardName:lower():find("spacestones") then
                             totalSpaceStones = totalSpaceStones + (reward:getAmount() or 0)
                         end
                         if rewardName:lower():find("ore") then
@@ -1179,9 +1189,9 @@ BuildUI = function()
 
                 table.insert(statusLines, string.format("%s %s: %s", status, itemName, progress))
                 
-                -- Track needed ores (not Space Stones)
                 if not hasEnough then
-                    if not (itemName:lower():find("spacestones") or itemName:lower():find("stone")) then
+                    if not (itemName:lower():find("spacestones") or itemName:lower():find("spacestone")) then
+                        
                         table.insert(neededOreNames, itemName)
                         needsOnlySpaceStones = false
                     end
@@ -1248,29 +1258,32 @@ BuildUI = function()
                                     task.wait(1)
                                 end
                             elseif not canUpgrade then
-                                -- Can't afford - need to mine materials
                                 
                                 if needsOnlySpaceStones == 1 then
-                                    
-                                    local pickaxeDamage = 10
-                                    
-                                    -- Get current pickaxe damage
-                                    local playerData = DataController:getData()
-                                    if playerData and playerData.inventory and playerData.inventory.exclusive then
-                                        for _, itemData in pairs(playerData.inventory.exclusive) do
-                                            local itemObj = Util.itemUtils.createItemFromData(itemData)
-                                            local itemName = itemObj:getName()
-                                            
-                                            if itemName:lower():find("pickaxe") then
-                                                local pickaxeData = ExclusiveItems[itemName]
-                                                if pickaxeData and pickaxeData.multiplier then
-                                                    pickaxeDamage = pickaxeData.multiplier
-                                                    break
+                                    -- Define getPickaxeDamage ONCE, outside the loop
+                                    local function getPickaxeDamage()
+                                        local data = DataController:getData()
+                                        if data and data.inventory and data.inventory.exclusive then
+                                            for _, itemData in pairs(data.inventory.exclusive) do
+                                                local itemObj = Util.itemUtils.createItemFromData(itemData)
+                                                local itemName = itemObj:getName()
+                                                
+                                                if itemName:lower():find("pickaxe") then
+                                                    local pickaxeData = ExclusiveItems[itemName]
+                                                    if pickaxeData and pickaxeData.multiplier then
+                                                        local baseDamage = pickaxeData.multiplier
+                                                        local playerMultiplier = data.pickaxeDamageMultiplier or 0
+                                                        local totalDamage = baseDamage + playerMultiplier
+                                                        return totalDamage, pickaxeData.name or itemName
+                                                    end
                                                 end
                                             end
                                         end
+                                        return 10, "Wooden Pickaxe"
                                     end
                                     
+                                    -- Now call it
+                                    local pickaxeDamage, pickaxeName = getPickaxeDamage()
                                     local maxHits = 75
                                     
                                     -- Find best beatable ore
@@ -1285,7 +1298,7 @@ BuildUI = function()
                                             if oreData.rewards then
                                                 for _, reward in ipairs(oreData.rewards) do
                                                     local rewardName = reward:getName() or ""
-                                                    if rewardName:lower():find("spacestones") or rewardName:lower():find("stone") then
+                                                    if rewardName:lower():find("spacestones") then
                                                         totalSpaceStones = totalSpaceStones + (reward:getAmount() or 0)
                                                     end
                                                 end
@@ -1306,25 +1319,25 @@ BuildUI = function()
                                         -- Update dropdown and selectedOres
                                         SelectOres:SetValue({[bestOre.formattedName] = true})
                                         selectedOres = {bestOre.formattedName}
-                                    end
-                                    
+                                    end  
+                                                                
                                 else
-                                    
+                                    -- Need to mine specific ores
                                     local dropdownSelection = {}
                                     selectedOres = {}
                                     
                                     for _, neededOreName in ipairs(neededOreNames) do
                                         local oreFound = false
                                         
-                                        local oreType = neededOreName:gsub("%s*Ore$", "")
+                                        local oreType = neededOreName:gsub("%s*Ore$", ""):lower()
                                         
                                         -- Search through values array (dropdown options)
                                         for _, formattedName in ipairs(values) do
                                             -- Remove "Ore" suffix from dropdown name too
-                                            local dropdownOreType = formattedName:gsub("%s*Ore$", "")
+                                            local dropdownOreType = formattedName:gsub("%s*Ore$", ""):lower()
                                             
                                             -- Check if this ore type matches (case-insensitive)
-                                            if dropdownOreType:lower():find(oreType:lower()) then
+                                            if dropdownOreType == oreType then
                                                 dropdownSelection[formattedName] = true
                                                 table.insert(selectedOres, formattedName)
                                                 oreFound = true
@@ -1529,20 +1542,20 @@ BuildUI = function()
                                 end
                                 lastQuestTier = currentTier
                             end
-                            
-                            -- Handle different quest types
+
+
                             if questType == "destroyOre" and questName then
-                                
                                 -- Select specific ore
-                                local oreType = questName:gsub("Ore$", ""):gsub("ore$", "")
+                                local oreType = questName:gsub("Ore$", ""):gsub("ore$", ""):lower()
                                 
                                 local dropdownSelection = {}
                                 selectedOres = {}
                                 
                                 for _, formattedName in ipairs(values) do
-                                    local dropdownOreType = formattedName:gsub("%s*Ore$", "")
-                                    
-                                    if dropdownOreType:lower():find(oreType:lower()) then
+                                    local dropdownOreType = formattedName:gsub("%s*Ore$", ""):lower()
+                                                                        
+                                    -- FIXED: Use exact case-insensitive match
+                                    if dropdownOreType == oreType then
                                         dropdownSelection[formattedName] = true
                                         table.insert(selectedOres, formattedName)
                                         break
@@ -1593,25 +1606,32 @@ BuildUI = function()
                                 
                             elseif questType == "openEgg" and questName then
                                 
-                                -- Find best ore for 75 hits and enable auto mine
-                                local pickaxeDamage = 10
-                                
-                                -- Get current pickaxe damage
-                                if playerData and playerData.inventory and playerData.inventory.exclusive then
-                                    for _, itemData in pairs(playerData.inventory.exclusive) do
-                                        local itemObj = Util.itemUtils.createItemFromData(itemData)
-                                        local itemName = itemObj:getName()
-                                        
-                                        if itemName:lower():find("pickaxe") then
-                                            local pickaxeData = ExclusiveItems[itemName]
-                                            if pickaxeData and pickaxeData.multiplier then
-                                                pickaxeDamage = pickaxeData.multiplier
-                                                break
+                                local function getPickaxeDamage()
+                                    local data = DataController:getData()
+                                    if data and data.inventory and data.inventory.exclusive then
+                                        for _, itemData in pairs(data.inventory.exclusive) do
+                                            local itemObj = Util.itemUtils.createItemFromData(itemData)
+                                            local itemName = itemObj:getName()
+                                            
+                                            if itemName:lower():find("pickaxe") then
+                                                local pickaxeData = ExclusiveItems[itemName]
+                                                if pickaxeData and pickaxeData.multiplier then
+                                                    -- Get base pickaxe damage
+                                                    local baseDamage = pickaxeData.multiplier
+                                                    
+                                                    -- Add player's pickaxeDamageMultiplier from data
+                                                    local playerMultiplier = data.pickaxeDamageMultiplier or 0
+                                                    local totalDamage = baseDamage + playerMultiplier
+                                                    
+                                                    return totalDamage, pickaxeData.name or itemName
+                                                end
                                             end
                                         end
                                     end
+                                    return 10, "Wooden Pickaxe"
                                 end
-                                
+
+                                local pickaxeDamage, pickaxeName = getPickaxeDamage()
                                 local maxHits = 75
                                 
                                 local bestOre = nil
@@ -1625,7 +1645,7 @@ BuildUI = function()
                                         if oreData.rewards then
                                             for _, reward in ipairs(oreData.rewards) do
                                                 local rewardName = reward:getName() or ""
-                                                if rewardName:lower():find("spacestones") or rewardName:lower():find("stone") then
+                                                if rewardName:lower():find("spacestones") then
                                                     totalSpaceStones = totalSpaceStones + (reward:getAmount() or 0)
                                                 end
                                             end
@@ -1880,31 +1900,40 @@ BuildUI = function()
                                         end
                                     end
                                 end
-                            end
-                            
+                            end              
+
                             if #neededOres > 0 then
                                 local dropdownSelection = {}
                                 selectedOres = {}
                                 
                                 for _, neededOreName in ipairs(neededOres) do
-                                    if neededOreName:lower():find("spacestones") or neededOreName:lower():find("stone") then
-                                        -- Get pickaxe damage
-                                        local pickaxeDamage = 10
-                                        if playerData and playerData.inventory and playerData.inventory.exclusive then
-                                            for _, itemData in pairs(playerData.inventory.exclusive) do
-                                                local itemObj = Util.itemUtils.createItemFromData(itemData)
-                                                local itemName = itemObj:getName()
-                                                
-                                                if itemName:lower():find("pickaxe") then
-                                                    local pickaxeData = ExclusiveItems[itemName]
-                                                    if pickaxeData and pickaxeData.multiplier then
-                                                        pickaxeDamage = pickaxeData.multiplier
-                                                        break
+                                    if neededOreName:lower():find("spacestones") then
+                                        local function getPickaxeDamage()
+                                            local data = DataController:getData()
+                                            if data and data.inventory and data.inventory.exclusive then
+                                                for _, itemData in pairs(data.inventory.exclusive) do
+                                                    local itemObj = Util.itemUtils.createItemFromData(itemData)
+                                                    local itemName = itemObj:getName()
+                                                    
+                                                    if itemName:lower():find("pickaxe") then
+                                                        local pickaxeData = ExclusiveItems[itemName]
+                                                        if pickaxeData and pickaxeData.multiplier then
+                                                            -- Get base pickaxe damage
+                                                            local baseDamage = pickaxeData.multiplier
+                                                            
+                                                            -- Add player's pickaxeDamageMultiplier from data
+                                                            local playerMultiplier = data.pickaxeDamageMultiplier or 0
+                                                            local totalDamage = baseDamage + playerMultiplier
+                                                            
+                                                            return totalDamage, pickaxeData.name or itemName
+                                                        end
                                                     end
                                                 end
                                             end
+                                            return 10, "Wooden Pickaxe"
                                         end
                                         
+                                        local pickaxeDamage, pickaxeName = getPickaxeDamage()
                                         local maxHits = 75
                                         
                                         -- Find best beatable ore (highest Space Stones reward)
@@ -1919,7 +1948,7 @@ BuildUI = function()
                                                 if oreData.rewards then
                                                     for _, reward in ipairs(oreData.rewards) do
                                                         local rewardName = reward:getName() or ""
-                                                        if rewardName:lower():find("spacestones") or rewardName:lower():find("stone") then
+                                                        if rewardName:lower():find("spacestones") then
                                                             totalSpaceStones = totalSpaceStones + (reward:getAmount() or 0)
                                                         end
                                                     end
@@ -1942,12 +1971,12 @@ BuildUI = function()
                                         end
                                     else
                                         -- Find matching ore (case insensitive)
-                                        local oreType = neededOreName:gsub("%s*Ore$", "")
+                                        local oreType = neededOreName:gsub("%s*Ore$", ""):lower()
                                         
                                         for _, formattedName in ipairs(values) do
-                                            local dropdownOreType = formattedName:gsub("%s*Ore$", "")
+                                            local dropdownOreType = formattedName:gsub("%s*Ore$", ""):lower()
                                             
-                                            if dropdownOreType:lower():find(oreType:lower()) then
+                                            if dropdownOreType == oreType then
                                                 dropdownSelection[formattedName] = true
                                                 table.insert(selectedOres, formattedName)
                                                 break
