@@ -55,7 +55,7 @@ BuildUI = function()
     CircusSection:Button({
         Title = "Instant Complete - Max Luck (1x)",
         Description = "Instantly completes the circus minigame with maximum luck once",
-        Callback = function() pcall(function() require(ReplicatedStorage.Packages.Knit).GetService("RewardService"):playCircusMinigame(10, false) end) end
+        Callback = function() pcall(function() require(ReplicatedStorage.Packages.Knit).GetService("RewardService"):playCircusMinigame(10, "normal") end) end
     })
 
     -- shared flag and task handle
@@ -99,7 +99,7 @@ BuildUI = function()
                         if hasTickets then
                             -- run the remote every 0.25s as long as tickets exist
                             pcall(function()
-                                RewardService:playCircusMinigame(10, false)
+                                RewardService:playCircusMinigame(10, "normal")
                             end)
                             task.wait(0.1)
                         else
