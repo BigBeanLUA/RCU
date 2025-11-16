@@ -123,17 +123,28 @@ BuildUI = function()
     })
 
     local autoSellEnabled = false
+    local autoSellThread
+
     local AutoSell = AutoFishSection:Toggle("AutoSellFish", {
         Title = "Auto Sell Fish",
         Description = "Automatically sells all fish EXCEPT the fish needed for rods upgrades.",
         Default = false,
         Callback = function(state)
             autoSellEnabled = state
+            
+            -- Stop previous loop if it exists
+            if autoSellThread and coroutine.status(autoSellThread) == "running" then
+                autoSellEnabled = false
+                task.cancel(autoSellThread)
+                autoSellThread = nil
+            end
+            
             if state then
-                task.spawn(function()
+                autoSellThread = task.spawn(function()
                     while autoSellEnabled do
                         local playerData = DataController:getData()
                         local currentIndex = nil
+                        
                         for _, itemData in pairs(playerData.inventory.exclusive) do
                             local itemObj = Util.itemUtils.createItemFromData(itemData)
                             if itemObj:getName():lower():find("fishingrod") then
@@ -164,7 +175,7 @@ BuildUI = function()
                         for itemId, itemData in pairs(playerData.inventory.fish or {}) do
                             local itemObj = Util.itemUtils.createItemFromData(itemData)
                             local fishName = itemObj:getName()
-                            
+
                             if not table.find(neededFishNames, fishName) then
                                 sellTable[itemId] = true
                             end
@@ -189,9 +200,9 @@ BuildUI = function()
         Title = "Auto Equip Best Rod",
         Description = "Automatically equips the best rod you own.",
         Default = false,
-        Callback = function(enabled)
-            isAutoEquipRodEnabled = enabled
-            if enabled then
+        Callback = function(Value)
+            isAutoEquipRodEnabled = Value
+            if Value then
                 task.spawn(function()
                     while isAutoEquipRodEnabled do
                         pcall(function()
@@ -221,6 +232,41 @@ BuildUI = function()
                             local isRodEquipped = playerData.isFishingRodEquipped
 
                             if not isRodEquipped then
+                                -- Find and unequip currently equipped item first
+                                local currentEquippedIndex = nil
+                                
+                                -- Check if axe is equipped
+                                if playerData.isAxeEquipped then
+                                    for itemId, itemData in pairs(playerData.inventory.exclusive) do
+                                        local itemObj = Util.itemUtils.createItemFromData(itemData)
+                                        local itemName = itemObj:getName()
+                                        if itemName:lower():find("axe") and not itemName:lower():find("pickaxe") then
+                                            currentEquippedIndex = itemId
+                                            break
+                                        end
+                                    end
+                                end
+                                
+                                -- Check if pickaxe is equipped
+                                if playerData.isPickaxeEquipped and not currentEquippedIndex then
+                                    for itemId, itemData in pairs(playerData.inventory.exclusive) do
+                                        local itemObj = Util.itemUtils.createItemFromData(itemData)
+                                        local itemName = itemObj:getName()
+                                        if itemName:lower():find("pickaxe") then
+                                            currentEquippedIndex = itemId
+                                            break
+                                        end
+                                    end
+                                end
+                                
+                                -- Unequip current item if found
+                                if currentEquippedIndex then
+                                    local Knit = require(game:GetService("ReplicatedStorage").Packages.Knit.KnitClient)
+                                    Knit.GetService("InventoryService"):useItem(currentEquippedIndex, {use=1})
+                                    task.wait(1)
+                                end
+                                
+                                -- Equip best rod
                                 local Knit = require(game:GetService("ReplicatedStorage").Packages.Knit.KnitClient)
                                 Knit.GetService("InventoryService"):useItem(bestRodId, {use=1})
                             else
@@ -251,6 +297,16 @@ BuildUI = function()
         end
     })
 
+    task.spawn(function()
+        while true do
+            if AutoFish.Value == false then
+                AutoEquip:SetValue(false)
+            elseif AutoFish.Value == true then
+                AutoEquip:SetValue(true)
+            end
+            task.wait(5)
+        end
+    end)
 
     local AutoUpgradeSection = Tabs.Fish:AddSection("Auto Upgrade Rod")
 
