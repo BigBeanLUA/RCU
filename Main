@@ -11,6 +11,30 @@ local player = Players.LocalPlayer
 local userid = player.UserId
 local username = player.Name
 
+-- Thread Manager - Add this here
+local ThreadManager = {}
+ThreadManager.threads = {}
+
+function ThreadManager:Add(key, thread)
+    self:Stop(key)
+    self.threads[key] = thread
+    return thread
+end
+
+function ThreadManager:Stop(key)
+    if self.threads[key] then
+        pcall(function() task.cancel(self.threads[key]) end)
+        self.threads[key] = nil
+    end
+end
+
+function ThreadManager:StopAll()
+    for key, thread in pairs(self.threads) do
+        pcall(function() task.cancel(thread) end)
+    end
+    self.threads = {}
+end
+
 
 local Library = loadstring(game:HttpGetAsync("https://github.com/ActualMasterOogway/Fluent-Renewed/releases/latest/download/Fluent.luau"))()
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/bigbeanscripts/Pet-Warriors/refs/heads/main/test"))()
@@ -109,20 +133,43 @@ BuildUI = function()
         return options
     end
 
-    -- This function dynamically finds the best UNLOCKED rebirth you can do right now.
     GetBestRebirthOption = function()
-        local Rebirths = require(ReplicatedStorage.Shared.List.Rebirths)
-        local Upgrades = require(ReplicatedStorage.Shared.List.Upgrades)
-        local buttonUpgrade = Upgrades.rebirthButtons.upgrades[DataController.data.upgrades.rebirthButtons or 0]
-        local unlockedOptions = {}
-        for rebirthId, rebirthAmount in pairs(Rebirths) do
-            if buttonUpgrade.value >= rebirthId then
-                table.insert(unlockedOptions, {id = rebirthId, amount = rebirthAmount})
+        local success, result = pcall(function()
+            local Rebirths = require(ReplicatedStorage.Shared.List.Rebirths)
+            local Vars = require(ReplicatedStorage.Shared.Variables)
+
+            DataController:waitForData()
+            local playerData = DataController:getData()
+            if not playerData then 
+                return nil 
             end
+
+            local basePrice = Vars.rebirthPrice or 0
+            local multiplier = Vars.rebirthPriceMultiplier or 0
+            local currentRebirths = playerData.rebirths or 0
+            local clicks = playerData.clicks or 0
+
+            local bestIndex = nil
+            local bestAmount = 0
+
+            for index, amount in pairs(Rebirths) do
+                local price = (basePrice + currentRebirths * multiplier) * amount
+                            + multiplier * (amount * (amount - 1) / 2)
+
+                if clicks >= price and amount > bestAmount then
+                    bestAmount = amount
+                    bestIndex = index
+                end
+            end
+            return bestIndex
+        end)
+
+        if not success then
         end
-        table.sort(unlockedOptions, function(a, b) return a.amount > b.amount end)
-        return #unlockedOptions > 0 and unlockedOptions[1].id or nil
+
+        return success and result or nil
     end
+
 
     -- This function is now only called ONCE.
     updateRebirthDropdown = function()
@@ -198,9 +245,11 @@ BuildUI = function()
                 while autoRebirthRunning do
                     local delay = tonumber(rebirthDelayInput.Value)
                     if not delay or delay == 0 then
+                        -- Use the dropdown selection (calls performRebirth)
                         local result = pcall(performRebirth)
                         task.wait(0.2)
                     else
+                        -- Use the "best option" logic with delay
                         task.wait(delay)
                         local bestOption = GetBestRebirthOption()
                         if bestOption then
@@ -4708,39 +4757,176 @@ end)
         end
     })
 
-    PassSection = Tabs.Misc:AddSection("Season Pass")
-    PassSection:Toggle("AutoClaimToggle", { Title = "Auto Claim Season Rewards", Description = "Automatically claims all available season pass rewards.", Default = false, Callback = function(s) _G.AutoClaimToggle = s end })
-    PassSection:Toggle("AutoResetPassToggle", { Title = "Auto Reset Season Pass", Description = "Automatically resets the pass AFTER all rewards have been claimed.", Default = false, Callback = function(s) _G.AutoResetPassToggle = s end })
+
+
+    PassSection = Tabs.Claim:AddSection("Season Pass")
+
+    PassSection:Toggle("AutoClaimAndReset", { 
+        Title = "Auto Claim and Reset Season Pass", 
+        Description = "Automatically claims rewards and resets pass:\n• Premium: Reset after claiming tiers 1-12 (both tracks)\n• Free: Reset after claiming tiers 1-12 (free track only)", 
+        Default = false, 
+        Callback = function(Value) 
+            _G.AutoClaimAndResetToggle = Value
+            print(string.format("[Season Pass] Auto Claim/Reset: %s", Value and "ENABLED" or "DISABLED"))
+        end 
+    })
 
     task.spawn(function()
         while task.wait(5) do
-            if not (_G.AutoClaimToggle or _G.AutoResetPassToggle) then continue end
+            if not _G.AutoClaimAndResetToggle then continue end
+            
             pcall(function()
-                local playerData = DataController:getData(); if not playerData then return end
-                local seasonNum, currentPassLevel, hasPremiumPass, claimedTiersData, totalTiers = seasonVariables.season, seasonUtils.seasonUtils.getLevel(playerData), playerData[("season%*PassPremium"):format(seasonVariables.season)], playerData[("season%*PassClaimed"):format(seasonVariables.season)], #seasonTiersList
-                local allRewardsClaimed = true
-
-                for tier = 1, totalTiers do
-                    if tier > currentPassLevel then allRewardsClaimed = false; break end
+                local playerData = DataController:getData()
+                
+                if not playerData then 
+                    print("[Season Pass] ❌ No player data")
+                    return 
+                end
+                
+                local seasonNum = seasonVariables.season
+                local currentPassLevel = seasonUtils.seasonUtils.getPassLevel(playerData)
+                local hasPremiumPass = playerData[("season%dPassPremium"):format(seasonNum)]
+                local claimedTiersData = playerData[("season%dPassClaimed"):format(seasonNum)]
+                local totalTiers = #seasonTiersList
+                
+                print(string.format("\n[Season Pass] 📊 Season: %d | Level: %d/%d | Premium: %s", 
+                    seasonNum, currentPassLevel, totalTiers, hasPremiumPass and "Yes" or "No"))
+                
+                -- Print what's already claimed
+                print("\n[Season Pass] 📋 Already Claimed Tiers:")
+                local claimedFree, claimedPremium = {}, {}
+                for rewardKey, _ in pairs(claimedTiersData) do
+                    local track = tonumber(rewardKey:sub(1, 1))
+                    local tier = tonumber(rewardKey:sub(2))
+                    if track == 1 then
+                        table.insert(claimedFree, tier)
+                    elseif track == 2 then
+                        table.insert(claimedPremium, tier)
+                    end
+                end
+                table.sort(claimedFree)
+                table.sort(claimedPremium)
+                
+                if #claimedFree > 0 then
+                    print(string.format("  Free Track: %s", table.concat(claimedFree, ", ")))
+                else
+                    print("  Free Track: None")
+                end
+                
+                if #claimedPremium > 0 then
+                    print(string.format("  Premium Track: %s", table.concat(claimedPremium, ", ")))
+                else
+                    print("  Premium Track: None")
+                end
+                
+                -- Claim all available unclaimed tiers
+                print("\n[Season Pass] 🔍 Attempting to claim available tiers...")
+                local claimedThisCycle = 0
+                for tier = 1, currentPassLevel do
                     for track = 1, 2 do
+                        -- Skip premium track if no premium pass
                         if track == 2 and not hasPremiumPass then continue end
-                        local rewardKey = ("%*%*"):format(track, tier)
                         
+                        local rewardKey = ("%d%d"):format(track, tier)
                         if not claimedTiersData[rewardKey] then
-                            allRewardsClaimed = false
-                            if _G.AutoClaimToggle then
+                            local trackName = track == 1 and "Free" or "Premium"
+                            print(string.format("[Season Pass] 🎁 Attempting to claim: Tier %d on %s Track (key: %s)", 
+                                tier, trackName, rewardKey))
+                            
+                            local success, err = pcall(function()
                                 SeasonService:claimTier(tier, track)
-                                task.wait(0.2)
+                            end)
+                            
+                            if success then
+                                print(string.format("  ✅ Successfully claimed Tier %d (%s)", tier, trackName))
+                                claimedThisCycle = claimedThisCycle + 1
+                            else
+                                print(string.format("  ❌ Failed to claim Tier %d (%s): %s", tier, trackName, tostring(err)))
                             end
+                            
+                            task.wait(0.5)
                         end
                     end
                 end
                 
-                if _G.AutoResetPassToggle and allRewardsClaimed then SeasonService:resetPass() end
+                if claimedThisCycle > 0 then
+                    print(string.format("\n[Season Pass] ✅ Claimed %d new rewards this cycle", claimedThisCycle))
+                else
+                    print("\n[Season Pass] ℹ️ No new rewards to claim")
+                end
+                
+                -- Check if we should reset
+                local shouldReset = false
+                local resetReason = ""
+                
+                if hasPremiumPass then
+                    -- Premium: Check if tiers 1-12 are claimed on BOTH tracks
+                    local premiumTiersComplete = true
+                    for tier = 1, 12 do
+                        if tier > currentPassLevel then
+                            premiumTiersComplete = false
+                            resetReason = string.format("Not enough level (at %d/12)", currentPassLevel)
+                            break
+                        end
+                        
+                        for track = 1, 2 do
+                            local rewardKey = ("%d%d"):format(track, tier)
+                            if not claimedTiersData[rewardKey] then
+                                premiumTiersComplete = false
+                                resetReason = string.format("Tier %d %s not claimed (key: %s)", 
+                                    tier, track == 1 and "Free" or "Premium", rewardKey)
+                                break
+                            end
+                        end
+                        
+                        if not premiumTiersComplete then break end
+                    end
+                    shouldReset = premiumTiersComplete
+                    if shouldReset then
+                        resetReason = "All tiers 1-12 claimed (Premium + Free tracks)"
+                    end
+                else
+                    -- Free: Check if tiers 1-12 are claimed on FREE track only
+                    local freeTiersComplete = true
+                    for tier = 1, 12 do
+                        if tier > currentPassLevel then
+                            freeTiersComplete = false
+                            resetReason = string.format("Not enough level (at %d/12)", currentPassLevel)
+                            break
+                        end
+                        
+                        local rewardKey = ("%d%d"):format(1, tier) -- Track 1 = Free
+                        if not claimedTiersData[rewardKey] then
+                            freeTiersComplete = false
+                            resetReason = string.format("Tier %d Free not claimed (key: %s)", tier, rewardKey)
+                            break
+                        end
+                    end
+                    shouldReset = freeTiersComplete
+                    if shouldReset then
+                        resetReason = "All tiers 1-12 claimed (Free track only)"
+                    end
+                end
+                
+                print(string.format("\n[Season Pass] 🔄 Reset Status: %s - %s", 
+                    shouldReset and "READY ✅" or "NOT READY ❌", resetReason))
+                
+                if shouldReset then
+                    print("[Season Pass] 🔄 Resetting pass NOW...")
+                    local success, err = pcall(function()
+                        SeasonService:resetPass()
+                    end)
+                    
+                    if success then
+                        print("[Season Pass] ✅ Pass reset successful!")
+                    else
+                        print(string.format("[Season Pass] ❌ Pass reset failed: %s", tostring(err)))
+                    end
+                    task.wait(1)
+                end
             end)
         end
     end)
-
 
     Aura = Tabs.Misc:AddSection("Aura")
     local AuraDices = require(ReplicatedStorage.Shared.List.Items.AuraDices)
