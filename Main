@@ -998,9 +998,9 @@ BuildUI = function()
         Title = "Auto Equip Best Axe",
         Description = "Automatically equips the best axe you own.",
         Default = false,
-        Callback = function(enabled)
-            isAutoEquipAxeEnabled = enabled
-            if enabled then
+        Callback = function(Value)
+            isAutoEquipAxeEnabled = Value
+            if Value then
                 task.spawn(function()
                     while isAutoEquipAxeEnabled do
                         pcall(function()
@@ -1028,6 +1028,40 @@ BuildUI = function()
                             local isAxeEquipped = playerData.isAxeEquipped
 
                             if not isAxeEquipped then
+                                -- Find and unequip currently equipped item first
+                                local currentEquippedIndex = nil
+                                
+                                -- Check if pickaxe is equipped
+                                if playerData.isPickaxeEquipped then
+                                    for inventoryIndex, itemData in pairs(playerData.inventory.exclusive) do
+                                        local itemObj = Util.itemUtils.createItemFromData(itemData)
+                                        local itemName = itemObj:getName()
+                                        if itemName:lower():find("pickaxe") then
+                                            currentEquippedIndex = inventoryIndex
+                                            break
+                                        end
+                                    end
+                                end
+                                
+                                -- Check if fishing rod is equipped
+                                if playerData.isFishingRodEquipped and not currentEquippedIndex then
+                                    for inventoryIndex, itemData in pairs(playerData.inventory.exclusive) do
+                                        local itemObj = Util.itemUtils.createItemFromData(itemData)
+                                        local itemName = itemObj:getName()
+                                        if itemName:lower():find("fishingrod") or itemName:lower():find("rod") then
+                                            currentEquippedIndex = inventoryIndex
+                                            break
+                                        end
+                                    end
+                                end
+                                
+                                -- Unequip current item if found
+                                if currentEquippedIndex then
+                                    InventoryService:useItem(currentEquippedIndex)
+                                    task.wait(1)
+                                end
+                                
+                                -- Equip best axe
                                 InventoryService:useItem(bestInventoryIndex)
                             else
                                 local currentAxe, currentAxeIndex, currentInventoryIndex = nil, 0, nil
@@ -1056,6 +1090,18 @@ BuildUI = function()
             end
         end
     })
+
+    task.spawn(function()
+        while true do
+            if AutoCutTreesToggle.Value == false then
+                AutoEquip:SetValue(false)
+            elseif AutoCutTreesToggle.Value == true then
+                AutoEquip:SetValue(true)
+            end
+            task.wait(5)
+        end
+    end)
+
 
     UpgradeAxe = Tabs.Tree:AddSection("Upgrade Axe")
     
@@ -4767,7 +4813,6 @@ end)
         Default = false, 
         Callback = function(Value) 
             _G.AutoClaimAndResetToggle = Value
-            print(string.format("[Season Pass] Auto Claim/Reset: %s", Value and "ENABLED" or "DISABLED"))
         end 
     })
 
@@ -4779,7 +4824,6 @@ end)
                 local playerData = DataController:getData()
                 
                 if not playerData then 
-                    print("[Season Pass] ❌ No player data")
                     return 
                 end
                 
@@ -4789,11 +4833,7 @@ end)
                 local claimedTiersData = playerData[("season%dPassClaimed"):format(seasonNum)]
                 local totalTiers = #seasonTiersList
                 
-                print(string.format("\n[Season Pass] 📊 Season: %d | Level: %d/%d | Premium: %s", 
-                    seasonNum, currentPassLevel, totalTiers, hasPremiumPass and "Yes" or "No"))
                 
-                -- Print what's already claimed
-                print("\n[Season Pass] 📋 Already Claimed Tiers:")
                 local claimedFree, claimedPremium = {}, {}
                 for rewardKey, _ in pairs(claimedTiersData) do
                     local track = tonumber(rewardKey:sub(1, 1))
@@ -4808,19 +4848,13 @@ end)
                 table.sort(claimedPremium)
                 
                 if #claimedFree > 0 then
-                    print(string.format("  Free Track: %s", table.concat(claimedFree, ", ")))
                 else
-                    print("  Free Track: None")
                 end
                 
                 if #claimedPremium > 0 then
-                    print(string.format("  Premium Track: %s", table.concat(claimedPremium, ", ")))
                 else
-                    print("  Premium Track: None")
                 end
                 
-                -- Claim all available unclaimed tiers
-                print("\n[Season Pass] 🔍 Attempting to claim available tiers...")
                 local claimedThisCycle = 0
                 for tier = 1, currentPassLevel do
                     for track = 1, 2 do
@@ -4830,18 +4864,14 @@ end)
                         local rewardKey = ("%d%d"):format(track, tier)
                         if not claimedTiersData[rewardKey] then
                             local trackName = track == 1 and "Free" or "Premium"
-                            print(string.format("[Season Pass] 🎁 Attempting to claim: Tier %d on %s Track (key: %s)", 
-                                tier, trackName, rewardKey))
                             
                             local success, err = pcall(function()
                                 SeasonService:claimTier(tier, track)
                             end)
                             
                             if success then
-                                print(string.format("  ✅ Successfully claimed Tier %d (%s)", tier, trackName))
                                 claimedThisCycle = claimedThisCycle + 1
                             else
-                                print(string.format("  ❌ Failed to claim Tier %d (%s): %s", tier, trackName, tostring(err)))
                             end
                             
                             task.wait(0.5)
@@ -4850,9 +4880,7 @@ end)
                 end
                 
                 if claimedThisCycle > 0 then
-                    print(string.format("\n[Season Pass] ✅ Claimed %d new rewards this cycle", claimedThisCycle))
                 else
-                    print("\n[Season Pass] ℹ️ No new rewards to claim")
                 end
                 
                 -- Check if we should reset
@@ -4886,7 +4914,6 @@ end)
                         resetReason = "All tiers 1-12 claimed (Premium + Free tracks)"
                     end
                 else
-                    -- Free: Check if tiers 1-12 are claimed on FREE track only
                     local freeTiersComplete = true
                     for tier = 1, 12 do
                         if tier > currentPassLevel then
@@ -4908,19 +4935,14 @@ end)
                     end
                 end
                 
-                print(string.format("\n[Season Pass] 🔄 Reset Status: %s - %s", 
-                    shouldReset and "READY ✅" or "NOT READY ❌", resetReason))
                 
                 if shouldReset then
-                    print("[Season Pass] 🔄 Resetting pass NOW...")
                     local success, err = pcall(function()
                         SeasonService:resetPass()
                     end)
                     
                     if success then
-                        print("[Season Pass] ✅ Pass reset successful!")
                     else
-                        print(string.format("[Season Pass] ❌ Pass reset failed: %s", tostring(err)))
                     end
                     task.wait(1)
                 end
