@@ -4022,6 +4022,7 @@ end)
 
     local isAutoCollectEnabled = false
     local autoCollectThread = nil
+    local selectedZones = {}
 
     local function claimChestsInUnlockedMaps()
         if not game:IsLoaded() then game.Loaded:Wait() end
@@ -4083,7 +4084,21 @@ end)
             local unlockedZones = getUnlockedZones()
             if #unlockedZones == 0 then return end
 
-            for _, zoneData in ipairs(unlockedZones) do
+            -- Filter zones based on selection
+            local zonesToCollect = {}
+            if next(selectedZones) then
+                -- If zones are selected, only collect from those
+                for _, zoneData in ipairs(unlockedZones) do
+                    if selectedZones[zoneData.name] then
+                        table.insert(zonesToCollect, zoneData)
+                    end
+                end
+            else
+                -- If no zones selected, collect from all unlocked zones
+                zonesToCollect = unlockedZones
+            end
+
+            for _, zoneData in ipairs(zonesToCollect) do
                 if not isAutoCollectEnabled then break end 
                 if not zoneData.cframe then continue end
 
@@ -4140,10 +4155,47 @@ end)
         pcall(beginChestCollection)
     end
 
-    -- 💠 Toggle for Auto Chest Collection
+    -- Get all available zones for dropdown
+    local function getAllZones()
+        local zoneOptions = {}
+        pcall(function()
+            local Maps = require(ReplicatedStorage.Shared.List.Maps)
+            local zoneList = {}
+            
+            for mapId, mapData in pairs(Maps) do
+                if mapData.name then
+                    table.insert(zoneList, {
+                        id = tonumber(mapId) or 0,
+                        name = mapData.name
+                    })
+                end
+            end
+            
+            table.sort(zoneList, function(a, b) return a.id < b.id end)
+            
+            for _, zone in ipairs(zoneList) do
+                table.insert(zoneOptions, zone.name)
+            end
+        end)
+        
+        return zoneOptions
+    end
+
+    -- Zone selection dropdown
+    local ZoneDropdown = ClaimSection:Dropdown("SelectZonesToCollect", {
+        Title = "Mini Chest Zones",
+        Values = getAllZones(),
+        Multi = true,
+        Searchable = true,
+        Default = {},
+        Callback = function(value)
+            selectedZones = value
+        end
+    })
+
+    -- Toggle for Auto Chest Collection
     ClaimSection:Toggle("Auto Collect Mini-Chests", {
         Title = "Auto Collect Mini-Chests",
-        Description = "Automatically teleports through unlocked zones and collects all mini-chests until stopped.",
         Default = false,
         Callback = function(enabled)
             isAutoCollectEnabled = enabled
