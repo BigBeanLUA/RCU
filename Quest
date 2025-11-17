@@ -468,7 +468,6 @@ local function BuildUI()
     -- Select Aura Dice Dropdown
     local auraDiceDropdown = ConfigSection:Dropdown("SelectAuraDice", {
         Title = "Select Aura Dice",
-        Description = "Select aura dice to use for quests",
         Values = getAuraDiceList(),
         Multi = true,
         Searchable = true,
@@ -482,6 +481,7 @@ local function BuildUI()
 
     -- Complete Quests Section - Updated with Auto Complete Logic
     local CompleteQuestsSection = Tabs.Quests:AddSection("Complete Quests")
+
 
     -- Select Quests Dropdown
     local questOptions = getAllQuests()
@@ -1631,38 +1631,13 @@ local function BuildUI()
                                         end
                                     end))
                                     
-                                
                                 elseif questType == "useCircusTickets" then
                                     table.insert(threads, task.spawn(function()
-
-                                        while seasonQuestEnabled do
-                                            local ok, result = pcall(function()
-                                                local playerData = DataController:getData()
-                                                if not playerData or not playerData.inventory or not playerData.inventory.exclusive then
-                                                    return "NO_DATA"
-                                                end
-
-                                                -- Check if player has circus tickets
-                                                local hasTickets = false
-                                                for _, item in pairs(playerData.inventory.exclusive) do
-                                                    if item.nm == "circusTicket" and (item.am or 0) > 0 then
-                                                        hasTickets = true
-                                                        break
-                                                    end
-                                                end
-
-                                                if hasTickets then
-                                                    RewardService:playCircusMinigame(10, "normal")
-                                                    return "USED"
-                                                else
-                                                    return "NO_TICKETS"
-                                                end
+                                        while tick() < nextCheckTime and seasonQuestEnabled do
+                                            pcall(function()
+                                                local RewardService = Knit.GetService("RewardService")
+                                                RewardService:playCircusMinigame(10, "normal")
                                             end)
-
-                                            if not ok or result == "NO_DATA" or result == "NO_TICKETS" then
-                                                break
-                                            end
-
                                             task.wait(2.5)
                                         end
                                     end))
