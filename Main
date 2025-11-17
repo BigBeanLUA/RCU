@@ -3091,6 +3091,17 @@ BuildUI = function()
         end
     })
 
+    local SeasonQuest = Tabs.Quest:AddSection("Season Quests")
+
+    SeasonQuest:Button({
+        Title = "Season Quests Script",
+        Description = "Sorry for the separate loadstring! Having such a large script was causing me to run out of local uses and creating lag issues.",
+        Callback = function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/BigBeanLUA/RCU/refs/heads/main/Quest"))()
+        end
+    })
+
+
         
     local MapQuestSection = Tabs.Quest:AddSection("Map Quests")
 
