@@ -491,11 +491,13 @@ local function BuildUI()
         Values = getAuraDiceList(),
         Multi = true,
         Searchable = true,
-        Default = {["Aura Dice"] = true},
+        Default = {},
         Callback = function(value)
             selectedAuraDice = value
         end
     })
+
+    auraDiceDropdown:SetValue({["Aura Dice"] = true})
 
     getAuraDiceList()
 
@@ -923,7 +925,7 @@ local function BuildUI()
                                                     if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
                                                         local model = targetInstance:FindFirstChildWhichIsA("Model")
                                                         if model then
-                                                            LocalPlayer.Character.HumanoidRootPart.CFrame = model:GetPivot() + Vector3.new(0, 5, 0)
+                                                            LocalPlayer.Character.HumanoidRootPart.CFrame = model:GetPivot() + Vector3.new(0, 1, 0)
                                                             print(string.format("[TREE QUEST] Teleported to lowest HP tree (%d HP) - %s in %s", 
                                                                 lowestHP, targetId, targetGroup))
                                                         end
@@ -1033,301 +1035,306 @@ local function BuildUI()
                                 end
                             end))
 
-                        elseif _G.CurrentResourceQuest == "ore" and oreQuest then
-                            table.insert(threads, task.spawn(function()
-                                
-                                -- Equip best pickaxe
-                                pcall(function()
-                                    local ExclusiveItems = require(ReplicatedStorage.Shared.List.Items.Exclusive)
-                                    local playerData = DataController:getData()
-                                    
-                                    local bestPickaxe, bestPickaxeIndex, bestInventoryIndex = nil, 0, nil
-                                    for inventoryIndex, itemData in pairs(playerData.inventory.exclusive) do
-                                        local itemObj = Util.itemUtils.createItemFromData(itemData)
-                                        local itemName = itemObj:getName()
-                                        
-                                        if itemName:lower():find("pickaxe") then
-                                            local pickaxeData = ExclusiveItems[itemName]
-                                            if pickaxeData and pickaxeData.index and pickaxeData.index > bestPickaxeIndex then
-                                                bestPickaxeIndex = pickaxeData.index
-                                                bestPickaxe = itemObj:getRealName()
-                                                bestInventoryIndex = inventoryIndex
-                                            end
-                                        end
-                                    end
-                                    
-                                    if not bestInventoryIndex then
-                                        return
-                                    end
-                                    
-                                    if not playerData.isPickaxeEquipped then
-                                        local currentEquippedIndex = nil
-                                        
-                                        if playerData.isFishingRodEquipped then
-                                            for itemId, itemData in pairs(playerData.inventory.exclusive) do
-                                                local itemObj = Util.itemUtils.createItemFromData(itemData)
-                                                local itemName = itemObj:getName()
-                                                if itemName:lower():find("fishingrod") then
-                                                    currentEquippedIndex = itemId
-                                                    break
-                                                end
-                                            end
-                                        end
-                                        
-                                        if playerData.isAxeEquipped and not currentEquippedIndex then
-                                            for itemId, itemData in pairs(playerData.inventory.exclusive) do
-                                                local itemObj = Util.itemUtils.createItemFromData(itemData)
-                                                local itemName = itemObj:getName()
-                                                if itemName:lower():find("axe") and not itemName:lower():find("pickaxe") then
-                                                    currentEquippedIndex = itemId
-                                                    break
-                                                end
-                                            end
-                                        end
-                                        
-                                        if currentEquippedIndex then
-                                            InventoryService:useItem(currentEquippedIndex, {use=1})
-                                            task.wait(1)
-                                        end
-                                        
-                                        InventoryService:useItem(bestInventoryIndex, {use=1})
-                                        task.wait(1)
-                                    else
-                                        local currentPickaxe, currentPickaxeIndex, currentPickaxeId = nil, 0, nil
-                                        for itemId, itemData in pairs(playerData.inventory.exclusive) do
-                                            local itemObj = Util.itemUtils.createItemFromData(itemData)
-                                            if itemObj:getName():lower():find("pickaxe") then
-                                                currentPickaxe = itemObj:getRealName()
-                                                currentPickaxeIndex = itemObj:directory()[itemObj:getName()].index
-                                                currentPickaxeId = itemId
-                                                break
-                                            end
-                                        end
-                                        
-                                        if not (currentPickaxeIndex == bestPickaxeIndex and currentPickaxeId == bestInventoryIndex) then
-                                            InventoryService:useItem(bestInventoryIndex, {use=1})
-                                            task.wait(1)
-                                        end
-                                    end
-                                end)
-                                
-                                -- Teleport to mine
-                                pcall(function()
-                                    local Maps = require(ReplicatedStorage.Shared.List.Maps)
-                                    local targetMachine = "Space Mine"
-                                    
-                                    for mapId, mapData in pairs(Maps) do
-                                        if mapData.machines then
-                                            for _, machine in pairs(mapData.machines) do
-                                                if machine.name == targetMachine and machine.teleport then
-                                                    local canTeleport = true
-                                                    if machine.canTeleport then
-                                                        local playerData = DataController:getData()
-                                                        canTeleport = machine.canTeleport(playerData)
-                                                    end
-                                                    
-                                                    if canTeleport then
-                                                        local character = LocalPlayer.Character
-                                                        if character and character:FindFirstChild("HumanoidRootPart") then
-                                                            LocalPlayer:RequestStreamAroundAsync(machine.teleport.p, 5)
-                                                            task.wait(0.5)
-                                                            character.HumanoidRootPart:PivotTo(machine.teleport)
-                                                            task.wait(1)
-                                                        end
-                                                    end
-                                                    return
-                                                end
-                                            end
-                                        end
-                                    end
-                                end)
-                                
-                                local Ores = require(ReplicatedStorage.Shared.List.Mine.Ores)
-                                local OreRooms = require(ReplicatedStorage.Shared.List.Mine.OreRooms)
-                                local ExclusiveItems = require(ReplicatedStorage.Shared.List.Items.Exclusive)
-                                
-                                local function getPickaxeDamage()
-                                    local data = DataController:getData()
-                                    if data and data.inventory and data.inventory.exclusive then
-                                        for _, itemData in pairs(data.inventory.exclusive) do
+                            elseif _G.CurrentResourceQuest == "ore" and oreQuest then
+                                table.insert(threads, task.spawn(function()
+                                    -- Equip best pickaxe (unchanged)
+                                    pcall(function()
+                                        local ExclusiveItems = require(ReplicatedStorage.Shared.List.Items.Exclusive)
+                                        local playerData = DataController:getData()
+                                        local bestPickaxe, bestPickaxeIndex, bestInventoryIndex = nil, 0, nil
+                                        for inventoryIndex, itemData in pairs(playerData.inventory.exclusive) do
                                             local itemObj = Util.itemUtils.createItemFromData(itemData)
                                             local itemName = itemObj:getName()
-                                            
                                             if itemName:lower():find("pickaxe") then
                                                 local pickaxeData = ExclusiveItems[itemName]
-                                                if pickaxeData and pickaxeData.multiplier then
-                                                    local baseDamage = pickaxeData.multiplier
-                                                    local playerMultiplier = data.pickaxeDamageMultiplier or 0
-                                                    return baseDamage + playerMultiplier
+                                                if pickaxeData and pickaxeData.index and pickaxeData.index > bestPickaxeIndex then
+                                                    bestPickaxeIndex = pickaxeData.index
+                                                    bestPickaxe = itemObj:getRealName()
+                                                    bestInventoryIndex = inventoryIndex
                                                 end
                                             end
                                         end
-                                    end
-                                    return 10
-                                end
-                                
-                                local function findBestRoomForOre(oreId, pickaxeDamage)
-                                    local bestRoom = nil
-                                    local bestChance = 0
-                                    local maxHitsAllowed = 75
-                                    local maxUnbeatable20Percent = 20
-                                    
-                                    for roomName, roomData in pairs(OreRooms) do
-                                        if roomData.ores and roomData.ores[oreId] then
-                                            local oreChance = roomData.ores[oreId]
-                                            
-                                            local totalChance = 0
-                                            local unbeatableChance = 0
-                                            
-                                            for roomOreId, chance in pairs(roomData.ores) do
-                                                totalChance = totalChance + chance
-                                                local roomOreData = Ores[roomOreId]
-                                                if roomOreData and roomOreData.hp then
-                                                    local hitsNeeded = math.ceil(roomOreData.hp / pickaxeDamage)
-                                                    if hitsNeeded > maxHitsAllowed then
-                                                        unbeatableChance = unbeatableChance + chance
+                                        if not bestInventoryIndex then return end
+                                        if not playerData.isPickaxeEquipped then
+                                            local currentEquippedIndex = nil
+                                            if playerData.isFishingRodEquipped then
+                                                for itemId, itemData in pairs(playerData.inventory.exclusive) do
+                                                    local itemObj = Util.itemUtils.createItemFromData(itemData)
+                                                    local itemName = itemObj:getName()
+                                                    if itemName:lower():find("fishingrod") then
+                                                        currentEquippedIndex = itemId
+                                                        break
                                                     end
                                                 end
                                             end
-                                            
-                                            local unbeatablePercent = (unbeatableChance / totalChance) * 100
-                                            
-                                            if unbeatablePercent <= maxUnbeatable20Percent and oreChance > bestChance then
-                                                bestChance = oreChance
-                                                bestRoom = roomName
+                                            if playerData.isAxeEquipped and not currentEquippedIndex then
+                                                for itemId, itemData in pairs(playerData.inventory.exclusive) do
+                                                    local itemObj = Util.itemUtils.createItemFromData(itemData)
+                                                    local itemName = itemObj:getName()
+                                                    if itemName:lower():find("axe") and not itemName:lower():find("pickaxe") then
+                                                        currentEquippedIndex = itemId
+                                                        break
+                                                    end
+                                                end
                                             end
-                                        end
-                                    end
-                                    
-                                    return bestRoom
-                                end
-                                
-                                local pickaxeDamage = getPickaxeDamage()
-                                local targetOreId = nil
-                                local matchAnyOre = false
-
-                                if oreQuest.type == "destroyOre" or oreQuest.type:find("destroyOre") then
-                                    local currentSeason = getCurrentSeason()
-                                    local seasonObj = ReplicatedStorage.Shared.List:FindFirstChild(("Season%d"):format(currentSeason))
-                                    if seasonObj then
-                                        if seasonObj:IsA("Folder") then
-                                            local preferred = seasonObj:FindFirstChild("Quests")
-                                            seasonObj = preferred and preferred:IsA("ModuleScript") and preferred or seasonObj:FindFirstChildWhichIsA("ModuleScript")
-                                        end
-                                        if seasonObj and seasonObj:IsA("ModuleScript") then
-                                            local SeasonModule = require(seasonObj)
-                                            local QuestsModule = SeasonModule.Quests or SeasonModule
-                                            local playerData = DataController:getData()
-                                            local seasonKey = ("season%dQuests"):format(currentSeason)
-                                            local seasonQuestsData = playerData[seasonKey] or {}
-                                            
-                                            for _, questSlot in pairs(seasonQuestsData) do
-                                                local questSet = QuestsModule[questSlot.questDifficulty]
-                                                local questInfo = questSet and questSet[questSlot.questId]
-                                                if questInfo and (questInfo.quest.quest == "destroyOre" or questInfo.quest.quest:find("destroyOre")) then
-                                                    targetOreId = questInfo.quest.name
+                                            if currentEquippedIndex then
+                                                InventoryService:useItem(currentEquippedIndex, {use=1})
+                                                task.wait(1)
+                                            end
+                                            InventoryService:useItem(bestInventoryIndex, {use=1})
+                                            task.wait(1)
+                                        else
+                                            local currentPickaxe, currentPickaxeIndex, currentPickaxeId = nil, 0, nil
+                                            for itemId, itemData in pairs(playerData.inventory.exclusive) do
+                                                local itemObj = Util.itemUtils.createItemFromData(itemData)
+                                                if itemObj:getName():lower():find("pickaxe") then
+                                                    currentPickaxe = itemObj:getRealName()
+                                                    currentPickaxeIndex = itemObj:directory()[itemObj:getName()].index
+                                                    currentPickaxeId = itemId
                                                     break
                                                 end
                                             end
-                                        end
-                                    end
-                                elseif oreQuest.type == "destroyAnyOre" then
-                                    matchAnyOre = true
-                                    local lowestHP = math.huge
-                                    for oreId, oreData in pairs(Ores) do
-                                        if oreData.hp and oreData.hp < lowestHP then
-                                            local hitsNeeded = math.ceil(oreData.hp / pickaxeDamage)
-                                            if hitsNeeded <= 75 then
-                                                lowestHP = oreData.hp
-                                                targetOreId = oreId
+                                            if not (currentPickaxeIndex == bestPickaxeIndex and currentPickaxeId == bestInventoryIndex) then
+                                                InventoryService:useItem(bestInventoryIndex, {use=1})
+                                                task.wait(1)
                                             end
                                         end
-                                    end
-                                end
+                                    end)
 
-                                if not targetOreId and not matchAnyOre then
-                                    return
-                                end
-
-                                local targetRoom = nil
-                                if targetOreId and not matchAnyOre then
-                                    targetRoom = findBestRoomForOre(targetOreId, pickaxeDamage)
-                                end
-
-                                local OreService = Knit.GetService("OreService")
-
-                                while tick() < nextCheckTime and seasonQuestEnabled do
-                                    local playerData = DataController:getData()
-                                    if not playerData or not playerData.ores then
-                                        task.wait(1)
-                                        continue
-                                    end
-                                    
-                                    local targetOre = nil
-                                    local targetRoomId = nil
-                                    local targetId = nil
-                                    local foundOreId = nil
-                                    
-                                    for _, ore in CollectionService:GetTagged("Ore") do
-                                        local roomId = ore:GetAttribute("roomId")
-                                        local id = ore:GetAttribute("id")
-                                        
-                                        if roomId and id and playerData.ores[roomId] and playerData.ores[roomId][id] then
-                                            local info = playerData.ores[roomId][id]
-                                            local oreData = Ores[info.oreId]
-                                            
-                                            if not oreData then continue end
-                                            
-                                            local isMatch = false
-                                            
-                                            if matchAnyOre then
-                                                local hitsNeeded = math.ceil(oreData.hp / pickaxeDamage)
-                                                if hitsNeeded <= 75 then
-                                                    isMatch = true
-                                                    if targetOreId and info.oreId == targetOreId then
-                                                        isMatch = true
-                                                        foundOreId = info.oreId
-                                                    elseif not foundOreId then
-                                                        isMatch = true
-                                                        foundOreId = info.oreId
-                                                    else
-                                                        isMatch = false
+                                    -- Teleport to mine every 20 seconds in a separate thread
+                                    table.insert(threads, task.spawn(function()
+                                        while seasonQuestEnabled and _G.CurrentResourceQuest == "ore" do
+                                            pcall(function()
+                                                local Maps = require(ReplicatedStorage.Shared.List.Maps)
+                                                local targetMachine = "Space Mine"
+                                                for mapId, mapData in pairs(Maps) do
+                                                    if mapData.machines then
+                                                        for _, machine in pairs(mapData.machines) do
+                                                            if machine.name == targetMachine and machine.teleport then
+                                                                local canTeleport = true
+                                                                if machine.canTeleport then
+                                                                    local playerData = DataController:getData()
+                                                                    canTeleport = machine.canTeleport(playerData)
+                                                                end
+                                                                if canTeleport then
+                                                                    local character = LocalPlayer.Character
+                                                                    if character and character:FindFirstChild("HumanoidRootPart") then
+                                                                        LocalPlayer:RequestStreamAroundAsync(machine.teleport.p, 5)
+                                                                        task.wait(0.5)
+                                                                        character.HumanoidRootPart:PivotTo(machine.teleport)
+                                                                        task.wait(1)
+                                                                    end
+                                                                end
+                                                                return
+                                                            end
+                                                        end
                                                     end
                                                 end
+                                            end)
+                                            task.wait(20)
+                                        end
+                                    end))
+
+                                    local Ores = require(ReplicatedStorage.Shared.List.Mine.Ores)
+                                    local OreRooms = require(ReplicatedStorage.Shared.List.Mine.OreRooms)
+                                    local ExclusiveItems = require(ReplicatedStorage.Shared.List.Items.Exclusive)
+                                    local OreService = Knit.GetService("OreService")
+
+                                    local function getPickaxeDamage()
+                                        local data = DataController:getData()
+                                        if data and data.inventory and data.inventory.exclusive then
+                                            for _, itemData in pairs(data.inventory.exclusive) do
+                                                local itemObj = Util.itemUtils.createItemFromData(itemData)
+                                                local itemName = itemObj:getName()
+                                                if itemName:lower():find("pickaxe") then
+                                                    local pickaxeData = ExclusiveItems[itemName]
+                                                    if pickaxeData and pickaxeData.multiplier then
+                                                        local baseDamage = pickaxeData.multiplier
+                                                        local playerMultiplier = data.pickaxeDamageMultiplier or 0
+                                                        return baseDamage + playerMultiplier
+                                                    end
+                                                end
+                                            end
+                                        end
+                                        return 10
+                                    end
+
+                                    local function findBestRoomForOre(oreId, pickaxeDamage)
+                                        local bestRoom = nil
+                                        local bestChance = 0
+                                        local maxHitsAllowed = 75
+                                        local maxUnbeatable20Percent = 20
+                                        for roomName, roomData in pairs(OreRooms) do
+                                            if roomData.ores and roomData.ores[oreId] then
+                                                local oreChance = roomData.ores[oreId]
+                                                local totalChance = 0
+                                                local unbeatableChance = 0
+                                                for roomOreId, chance in pairs(roomData.ores) do
+                                                    totalChance = totalChance + chance
+                                                    local roomOreData = Ores[roomOreId]
+                                                    if roomOreData and roomOreData.hp then
+                                                        local hitsNeeded = math.ceil(roomOreData.hp / pickaxeDamage)
+                                                        if hitsNeeded > maxHitsAllowed then
+                                                            unbeatableChance = unbeatableChance + chance
+                                                        end
+                                                    end
+                                                end
+                                                local unbeatablePercent = (unbeatableChance / totalChance) * 100
+                                                if unbeatablePercent <= maxUnbeatable20Percent and oreChance > bestChance then
+                                                    bestChance = oreChance
+                                                    bestRoom = roomName
+                                                end
+                                            end
+                                        end
+                                        return bestRoom
+                                    end
+
+                                    local pickaxeDamage = getPickaxeDamage()
+                                    local targetOreId = nil
+                                    local matchAnyOre = false
+
+                                    if oreQuest.type == "destroyOre" or oreQuest.type:find("destroyOre") then
+                                        local currentSeason = getCurrentSeason()
+                                        local seasonObj = ReplicatedStorage.Shared.List:FindFirstChild(("Season%d"):format(currentSeason))
+                                        if seasonObj then
+                                            if seasonObj:IsA("Folder") then
+                                                local preferred = seasonObj:FindFirstChild("Quests")
+                                                seasonObj = preferred and preferred:IsA("ModuleScript") and preferred or seasonObj:FindFirstChildWhichIsA("ModuleScript")
+                                            end
+                                            if seasonObj and seasonObj:IsA("ModuleScript") then
+                                                local SeasonModule = require(seasonObj)
+                                                local QuestsModule = SeasonModule.Quests or SeasonModule
+                                                local playerData = DataController:getData()
+                                                local seasonKey = ("season%dQuests"):format(currentSeason)
+                                                local seasonQuestsData = playerData[seasonKey] or {}
+                                                for _, questSlot in pairs(seasonQuestsData) do
+                                                    local questSet = QuestsModule[questSlot.questDifficulty]
+                                                    local questInfo = questSet and questSet[questSlot.questId]
+                                                    if questInfo and (questInfo.quest.quest == "destroyOre" or questInfo.quest.quest:find("destroyOre")) then
+                                                        targetOreId = questInfo.quest.name
+                                                        break
+                                                    end
+                                                end
+                                            end
+                                        end
+
+                                    elseif oreQuest.type == "destroyAnyOre" then
+                                        matchAnyOre = true
+                                    end
+
+                                    while tick() < nextCheckTime and seasonQuestEnabled do
+                                        local playerData = DataController:getData()
+                                        if not playerData or not playerData.ores then
+                                            task.wait(0.25)
+                                            continue
+                                        end
+
+                                        if matchAnyOre then
+                                            -- destroyAnyOre: Mine the lowest HP beatable ore every second
+                                            local lowestHP = math.huge
+                                            local targetOre = nil
+                                            local targetRoomId, targetId = nil, nil
+                                            for _, ore in CollectionService:GetTagged("Ore") do
+                                                local roomId = ore:GetAttribute("roomId")
+                                                local id = ore:GetAttribute("id")
+                                                if roomId and id and playerData.ores[roomId] and playerData.ores[roomId][id] then
+                                                    local info = playerData.ores[roomId][id]
+                                                    local oreData = Ores[info.oreId]
+                                                    if oreData then
+                                                        local hitsNeeded = math.ceil(oreData.hp / pickaxeDamage)
+                                                        local remaining = oreData.hp - (info.damage or 0)
+                                                        if hitsNeeded <= 75 and remaining > 0 and remaining < lowestHP then
+                                                            lowestHP = remaining
+                                                            targetOre = ore
+                                                            targetRoomId = roomId
+                                                            targetId = id
+                                                        end
+                                                    end
+                                                end
+                                            end
+                                            if targetOre and targetRoomId and targetId then
+                                                pcall(function()
+                                                    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                                                    local orePart = targetOre.PrimaryPart or targetOre:FindFirstChildWhichIsA("BasePart")
+                                                    if hrp and orePart then
+                                                        hrp.CFrame = orePart.CFrame + Vector3.new(0, 3, 0)
+                                                    end
+                                                end)
+                                                OreService.damage._re:FireServer(targetRoomId, targetId)
+                                            end
+                                            task.wait(0.25)
+                                        else
+                                            -- destroyOre: Mine the target ore, fallback to best room if none available
+                                            local foundTargetOre = false
+                                            local targetRoomId, targetId, targetOre = nil, nil, nil
+                                            for _, ore in CollectionService:GetTagged("Ore") do
+                                                local roomId = ore:GetAttribute("roomId")
+                                                local id = ore:GetAttribute("id")
+                                                if roomId and id and playerData.ores[roomId] and playerData.ores[roomId][id] then
+                                                    local info = playerData.ores[roomId][id]
+                                                    local oreData = Ores[info.oreId]
+                                                    if oreData and info.oreId == targetOreId then
+                                                        local hitsNeeded = math.ceil(oreData.hp / pickaxeDamage)
+                                                        local remaining = oreData.hp - (info.damage or 0)
+                                                        if hitsNeeded <= 75 and remaining > 0 then
+                                                            foundTargetOre = true
+                                                            targetRoomId = roomId
+                                                            targetId = id
+                                                            targetOre = ore
+                                                            break
+                                                        end
+                                                    end
+                                                end
+                                            end
+                                            if foundTargetOre and targetRoomId and targetId then
+                                                pcall(function()
+                                                    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                                                    local orePart = targetOre.PrimaryPart or targetOre:FindFirstChildWhichIsA("BasePart")
+                                                    if hrp and orePart then
+                                                        hrp.CFrame = orePart.CFrame + Vector3.new(0, 3, 0)
+                                                    end
+                                                end)
+                                                OreService.damage._re:FireServer(targetRoomId, targetId)
+                                                task.wait(0.25)
                                             else
-                                                isMatch = (info.oreId == targetOreId)
-                                            end
-                                            
-                                            local roomMatch = (not targetRoom) or (roomId == targetRoom)
-                                            
-                                            if isMatch and roomMatch then
-                                                local remaining = oreData.hp - (info.damage or 0)
-                                                if remaining > 0 then
-                                                    targetOre = ore
-                                                    targetRoomId = roomId
-                                                    targetId = id
-                                                    break
+                                                -- Fallback: go to best room for target ore, mine weakest beatable ore in that room
+                                                local bestRoom = findBestRoomForOre(targetOreId, pickaxeDamage)
+                                                local weakestOre, weakestHP, fallbackRoomId, fallbackId = nil, math.huge, nil, nil
+                                                for _, ore in CollectionService:GetTagged("Ore") do
+                                                    local roomId = ore:GetAttribute("roomId")
+                                                    local id = ore:GetAttribute("id")
+                                                    if roomId == bestRoom and id and playerData.ores[roomId] and playerData.ores[roomId][id] then
+                                                        local info = playerData.ores[roomId][id]
+                                                        local oreData = Ores[info.oreId]
+                                                        if oreData then
+                                                            local hitsNeeded = math.ceil(oreData.hp / pickaxeDamage)
+                                                            local remaining = oreData.hp - (info.damage or 0)
+                                                            if hitsNeeded <= 75 and remaining > 0 and remaining < weakestHP then
+                                                                weakestHP = remaining
+                                                                weakestOre = ore
+                                                                fallbackRoomId = roomId
+                                                                fallbackId = id
+                                                            end
+                                                        end
+                                                    end
                                                 end
+                                                if weakestOre and fallbackRoomId and fallbackId then
+                                                    pcall(function()
+                                                        local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                                                        local orePart = weakestOre.PrimaryPart or weakestOre:FindFirstChildWhichIsA("BasePart")
+                                                        if hrp and orePart then
+                                                            hrp.CFrame = orePart.CFrame + Vector3.new(0, 3, 0)
+                                                        end
+                                                    end)
+                                                    OreService.damage._re:FireServer(fallbackRoomId, fallbackId)
+                                                end
+                                                task.wait(0.25)
                                             end
                                         end
                                     end
-                                    
-                                    if targetOre and targetRoomId and targetId then
-                                        pcall(function()
-                                            local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                                            local orePart = targetOre.PrimaryPart or targetOre:FindFirstChildWhichIsA("BasePart")
-                                            if hrp and orePart then
-                                                hrp.CFrame = orePart.CFrame + Vector3.new(0, 3, 0)
-                                            end
-                                        end)
-                                        
-                                        OreService.damage._re:FireServer(targetRoomId, targetId)
-                                    end
-                                    
-                                    task.wait(0.25)
-                                end
-                            end))
-                        end
+                                end))
+                            end
+
                             -- Other quests threads
                             for _, quest in ipairs(otherQuests) do
                                 local questType = quest.type
@@ -1494,7 +1501,7 @@ local function BuildUI()
                                                 end
                                             end)
                                             
-                                            task.wait(3)
+                                            task.wait(5.25)
                                         end
                                     end))
                                 elseif questType == "useMegaPotions" then
@@ -1601,27 +1608,29 @@ local function BuildUI()
                                                 end
                                             end)
                                             
-                                            task.wait(3)
+                                            task.wait(5.25)
                                         end
                                     end))
 
-                                elseif questType == "useAuraDice" or questType == "rollOneInAura" then
+                                elseif questType == "useAuraDice" then
+                                    print("Starting Aura Dice quest thread")
                                     table.insert(threads, task.spawn(function()
                                         if selectedAuraDice and next(selectedAuraDice) then
+                                            local AuraDices = require(ReplicatedStorage.Shared.List.Items.AuraDices)
                                             while tick() < nextCheckTime and seasonQuestEnabled do
                                                 for diceName, isSelected in pairs(selectedAuraDice) do
                                                     if isSelected then
-                                                        local AuraDices = require(ReplicatedStorage.Shared.List.Items.AuraDices)
                                                         for diceId, diceData in pairs(AuraDices) do
                                                             if diceData.name == diceName then
                                                                 AuraService:roll(diceId)
+                                                                print("Rolled Aura Dice:", diceName, "ID:", diceId)
                                                                 task.wait(0.5)
                                                                 break
                                                             end
                                                         end
-                                                        break
                                                     end
                                                 end
+                                                task.wait(0.5)
                                             end
                                         end
                                     end))
@@ -1692,7 +1701,7 @@ local function BuildUI()
                                                 local RewardService = Knit.GetService("RewardService")
                                                 RewardService:playCircusMinigame(10, "normal")
                                             end)
-                                            task.wait(2.5)
+                                            task.wait(2.75)
                                         end
                                     end))
 
