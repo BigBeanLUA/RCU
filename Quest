@@ -703,7 +703,8 @@ local function BuildUI()
                                                 if meteor and meteor:IsDescendantOf(workspace) then
                                                     local meteorId = meteor:GetAttribute("meteorId")
                                                     if meteorId then
-                                                        EventService.destroyMeteor._re:FireServer(meteorId)
+                                                        EventService = Knit.GetService("EventService")
+                                                        EventService.damageMeteor._re:FireServer(meteorId)
                                                     end
                                                 end
                                             end
@@ -1360,7 +1361,7 @@ local function BuildUI()
                                             end
                                         end
                                     end))
-                                    
+
                                 elseif questType == "craftSmoothie" then
                                     table.insert(threads, task.spawn(function()
                                         
