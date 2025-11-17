@@ -26,6 +26,7 @@ local selectedMythicalEternalEgg = nil
 
 DataController = Knit.GetController("DataController")
 TreeController = Knit.GetController("TreeController")
+RewardService = Knit.GetService("RewardService")
 
 -- Detect Highest Available Season
 local function getCurrentSeason()
@@ -749,9 +750,7 @@ local function BuildUI()
 
 
                         if _G.CurrentResourceQuest == "tree" and treeQuest then
-                            table.insert(threads, task.spawn(function()
-                                print("[TREE QUEST] Starting tree quest handler")
-                                
+                            table.insert(threads, task.spawn(function()                                
                                 -- Equip best axe
                                 pcall(function()
                                     local ExclusiveItems = require(ReplicatedStorage.Shared.List.Items.Exclusive)
@@ -773,11 +772,8 @@ local function BuildUI()
                                     end
                                     
                                     if not bestInventoryIndex then
-                                        print("[TREE QUEST] No axe found in inventory!")
                                         return
                                     end
-                                    
-                                    print("[TREE QUEST] Best axe:", bestAxe)
                                     
                                     if not playerData.isAxeEquipped then
                                         local currentEquippedIndex = nil
@@ -805,12 +801,10 @@ local function BuildUI()
                                         end
                                         
                                         if currentEquippedIndex then
-                                            print("[TREE QUEST] Unequipping current item")
                                             InventoryService:useItem(currentEquippedIndex, {use=1})
                                             task.wait(1)
                                         end
-                                        
-                                        print("[TREE QUEST] Equipping best axe")
+
                                         InventoryService:useItem(bestInventoryIndex, {use=1})
                                         task.wait(1)
                                     end
@@ -926,8 +920,6 @@ local function BuildUI()
                                                         local model = targetInstance:FindFirstChildWhichIsA("Model")
                                                         if model then
                                                             LocalPlayer.Character.HumanoidRootPart.CFrame = model:GetPivot() + Vector3.new(0, 1, 0)
-                                                            print(string.format("[TREE QUEST] Teleported to lowest HP tree (%d HP) - %s in %s", 
-                                                                lowestHP, targetId, targetGroup))
                                                         end
                                                     end
                                                 end)
@@ -1368,6 +1360,7 @@ local function BuildUI()
                                             end
                                         end
                                     end))
+                                    
                                 elseif questType == "craftSmoothie" then
                                     table.insert(threads, task.spawn(function()
                                         
@@ -1409,8 +1402,8 @@ local function BuildUI()
                                                 if bestSmoothie and maxCraftable > 0 then
                                                     local amountToCraft = math.min(maxCraftable, questData.required - questData.progress)
                                                     
-                                                    local LumberjackService = Knit.GetService("LumberjackService")
-                                                    LumberjackService:craftSmoothie(bestSmoothie, amountToCraft)
+                                                    local RewardService = Knit.GetService("RewardService")
+                                                    RewardService:craftSmoothie(bestSmoothie, amountToCraft)
                                                     task.wait(1)
                                                 else
                                                 end
@@ -1422,14 +1415,15 @@ local function BuildUI()
 
                                 elseif questType == "craftUltraPotions" then
                                     table.insert(threads, task.spawn(function()
-                                        
                                         while tick() < nextCheckTime and seasonQuestEnabled do
                                             pcall(function()
                                                 local MagicPot = require(ReplicatedStorage.Shared.List.MagicPot)
                                                 DataController:waitForData()
                                                 local playerData = DataController:getData()
                                                 
-                                                if not playerData or not playerData.inventory then return end
+                                                if not playerData or not playerData.inventory then
+                                                    return
+                                                end
                                                 
                                                 -- Get current progress
                                                 local currentSeason = getCurrentSeason()
@@ -1458,7 +1452,6 @@ local function BuildUI()
                                                 end
                                                 
                                                 local remaining = questData.required - currentProgress
-                                                
                                                 if remaining <= 0 then 
                                                     return 
                                                 end
@@ -1467,23 +1460,19 @@ local function BuildUI()
                                                 local bestPotionIndex = nil
                                                 local maxCraftable = 0
                                                 
-                                                -- Ultra potions are indices 10-12 in MagicPot (ultraClicks, ultraGems, ultraLuck)
                                                 for index = 10, 12 do
                                                     local potionData = MagicPot[index]
                                                     if potionData and potionData.required then
                                                         local canCraft = math.huge
-                                                        
+                                                        -- Check all requirements
                                                         for _, requiredItem in ipairs(potionData.required) do
                                                             local itemName = requiredItem:getName()
                                                             local requiredAmount = requiredItem:getAmount()
-                                                            
                                                             local currentItem = Util.itemUtils.getItemFromName(playerData, itemName)
                                                             local currentAmount = currentItem and currentItem:getAmount() or 0
-                                                            
                                                             local possibleCrafts = math.floor(currentAmount / requiredAmount)
                                                             canCraft = math.min(canCraft, possibleCrafts)
                                                         end
-                                                        
                                                         if canCraft > maxCraftable then
                                                             maxCraftable = canCraft
                                                             bestPotionIndex = index
@@ -1494,16 +1483,15 @@ local function BuildUI()
                                                 if bestPotionIndex and maxCraftable > 0 then
                                                     local amountToCraft = math.min(maxCraftable, remaining)
                                                     local potionName = MagicPot[bestPotionIndex].item:getName()
-                                                    
-                                                    RewardService:magicPot(bestPotionIndex, amountToCraft)
+                                                    Knit.GetService("RewardService"):magicPot(bestPotionIndex, amountToCraft)
                                                     task.wait(1)
                                                 else
                                                 end
                                             end)
-                                            
                                             task.wait(5.25)
                                         end
                                     end))
+
                                 elseif questType == "useMegaPotions" then
                                     table.insert(threads, task.spawn(function()
                                         while tick() < nextCheckTime and seasonQuestEnabled do
@@ -1613,7 +1601,6 @@ local function BuildUI()
                                     end))
 
                                 elseif questType == "useAuraDice" then
-                                    print("Starting Aura Dice quest thread")
                                     table.insert(threads, task.spawn(function()
                                         if selectedAuraDice and next(selectedAuraDice) then
                                             local AuraDices = require(ReplicatedStorage.Shared.List.Items.AuraDices)
@@ -1623,7 +1610,6 @@ local function BuildUI()
                                                         for diceId, diceData in pairs(AuraDices) do
                                                             if diceData.name == diceName then
                                                                 AuraService:roll(diceId)
-                                                                print("Rolled Aura Dice:", diceName, "ID:", diceId)
                                                                 task.wait(0.5)
                                                                 break
                                                             end
@@ -1634,23 +1620,29 @@ local function BuildUI()
                                             end
                                         end
                                     end))
-                                    
+                                            
                                 elseif questType == "collectPlaytimeRewards" then
                                     table.insert(threads, task.spawn(function()
-                                        local Holder = LocalPlayer.PlayerGui.MainUI.Menus.RewardsFrame.Main.Displays.Playtime.Holder
-                                        for _, rewardFrame in ipairs(Holder:GetChildren()) do
-                                            if rewardFrame:IsA("Frame") and rewardFrame:FindFirstChild("Claim") then
-                                                local claimButton = rewardFrame.Claim
-                                                if claimButton.Visible then
-                                                    for _, connection in pairs(getconnections(claimButton.MouseButton1Click)) do
-                                                        connection:Fire()
+                                        while tick() < nextCheckTime and seasonQuestEnabled do
+                                            local Holder = LocalPlayer.PlayerGui.MainUI.Menus.RewardsFrame.Main.Displays.Playtime.Holder
+                                            local success, err = pcall(function()
+                                                for _, rewardFrame in ipairs(Holder:GetChildren()) do
+                                                    if rewardFrame:IsA("Frame") then
+                                                        local rewardId = tonumber(rewardFrame.Name)
+                                                        local timerLabel = rewardFrame:FindFirstChild("Main", true) and rewardFrame.Main:FindFirstChild("Timer")
+                                                        if timerLabel and timerLabel.Text == "Claim" then
+                                                            RewardService:claimPlaytimeReward(rewardId)
+                                                            task.wait(1)
+                                                        end
                                                     end
-                                                    task.wait(0.5)
                                                 end
+                                            end)
+                                            if not success then
+                                                 print("Playtime claim error:", err)
                                             end
+                                            task.wait(10)
                                         end
                                     end))
-                                    
                                 elseif questType == "ancientSpin" then
                                     table.insert(threads, task.spawn(function()
                                         while tick() < nextCheckTime and seasonQuestEnabled do
