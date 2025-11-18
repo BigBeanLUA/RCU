@@ -4963,7 +4963,7 @@ end)
                 if hasPremiumPass then
                     -- Premium: Check if tiers 1-12 are claimed on BOTH tracks
                     local premiumTiersComplete = true
-                    for tier = 1, 12 do
+                    for tier = 1, 14 do
                         if tier > currentPassLevel then
                             premiumTiersComplete = false
                             resetReason = string.format("Not enough level (at %d/12)", currentPassLevel)
