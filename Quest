@@ -667,9 +667,8 @@ local function BuildUI()
                                 end
                             end
                             local threads = {}
-                            
-                            -- Egg hatching thread (openAnyEgg, hatchEpicPet, hatchLegendaryPet)
-                            if eggQuest then
+
+                            if eggQuest and _G.CurrentResourceQuest ~= "tree" then
                                 local quest = eggQuest
                                 table.insert(threads, task.spawn(function()
                                     while tick() < nextCheckTime and seasonQuestEnabled do
@@ -678,9 +677,8 @@ local function BuildUI()
                                     end
                                 end))
                             end
-                            
-                            -- Mythical/Eternal hatching thread (separate from regular eggs)
-                            if mythicalEternalQuest then
+
+                            if mythicalEternalQuest and _G.CurrentResourceQuest ~= "tree" then
                                 local quest = mythicalEternalQuest
                                 table.insert(threads, task.spawn(function()
                                     while tick() < nextCheckTime and seasonQuestEnabled do
@@ -689,7 +687,7 @@ local function BuildUI()
                                     end
                                 end))
                             end
-                            
+                                                        
                             -- Meteor breaking thread (can run alongside other quests)
                             if meteorQuest then
                                 table.insert(threads, task.spawn(function()
