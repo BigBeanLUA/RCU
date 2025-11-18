@@ -1505,18 +1505,24 @@ local function BuildUI()
                                         while tick() < nextCheckTime and seasonQuestEnabled do
                                             local playerData = DataController:getData()
                                             if playerData and playerData.inventory and playerData.inventory.potion then
-                                                local foundPotion = false
+                                                local bestPotionId, bestPotionName, bestAmount = nil, nil, 0
                                                 for potionId, potionData in pairs(playerData.inventory.potion) do
-                                                    if potionData.nm and potionData.nm:lower():find("mega") and potionData.am > 0 then
-                                                        local remaining = questData.required - questData.progress
-                                                        local amountToUse = math.min(remaining, potionData.am)
-                                                        InventoryService:useItem(potionId, {use = amountToUse})
-                                                        task.wait(0.5)
-                                                        foundPotion = true
-                                                        break
+                                                    local name = potionData.nm or tostring(potionId)
+                                                    local amount = potionData.am or 0
+                                                    if name:lower():find("mega") and amount > bestAmount then
+                                                        bestPotionId = potionId
+                                                        bestPotionName = name
+                                                        bestAmount = amount
                                                     end
                                                 end
-                                                if not foundPotion then break end
+                                                if bestPotionId then
+                                                    local remaining = questData.required - questData.progress
+                                                    local amountToUse = math.min(remaining, bestAmount)
+                                                    InventoryService:useItem(bestPotionId, {use = amountToUse})
+                                                    task.wait(5)
+                                                else
+                                                    break
+                                                end
                                             else
                                                 break
                                             end
