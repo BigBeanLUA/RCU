@@ -749,190 +749,138 @@ local function BuildUI()
 
 
                         if _G.CurrentResourceQuest == "tree" and treeQuest then
-                            table.insert(threads, task.spawn(function()                                
-                                -- Equip best axe
-                                pcall(function()
-                                    local ExclusiveItems = require(ReplicatedStorage.Shared.List.Items.Exclusive)
-                                    local playerData = DataController:getData()
-                                    
-                                    local bestAxe, bestAxeIndex, bestInventoryIndex = nil, 0, nil
-                                    for inventoryIndex, itemData in pairs(playerData.inventory.exclusive) do
-                                        local itemObj = Util.itemUtils.createItemFromData(itemData)
-                                        local itemName = itemObj:getName()
-                                        
-                                        if itemName:lower():find("axe") and not itemName:lower():find("pickaxe") then
-                                            local axeData = ExclusiveItems[itemName]
-                                            if axeData and axeData.index and axeData.index > bestAxeIndex then
-                                                bestAxeIndex = axeData.index
-                                                bestAxe = itemObj:getRealName()
-                                                bestInventoryIndex = inventoryIndex
-                                            end
-                                        end
-                                    end
-                                    
-                                    if not bestInventoryIndex then
-                                        return
-                                    end
-                                    
-                                    if not playerData.isAxeEquipped then
-                                        local currentEquippedIndex = nil
-                                        
-                                        if playerData.isFishingRodEquipped then
-                                            for itemId, itemData in pairs(playerData.inventory.exclusive) do
-                                                local itemObj = Util.itemUtils.createItemFromData(itemData)
-                                                local itemName = itemObj:getName()
-                                                if itemName:lower():find("fishingrod") then
-                                                    currentEquippedIndex = itemId
-                                                    break
+                            table.insert(threads, task.spawn(function()
+                                local treesToCut = {"spawn", "desert", "nuclear"}
+                                while seasonQuestEnabled and _G.CurrentResourceQuest == "tree" do
+                                    pcall(function()
+                                        -- Equip best axe if not equipped
+                                        local ExclusiveItems = require(ReplicatedStorage.Shared.List.Items.Exclusive)
+                                        local playerData = DataController:getData()
+                                        local bestAxe, bestAxeIndex, bestInventoryIndex = nil, 0, nil
+                                        for inventoryIndex, itemData in pairs(playerData.inventory.exclusive) do
+                                            local itemObj = Util.itemUtils.createItemFromData(itemData)
+                                            local itemName = itemObj:getName()
+                                            if itemName:lower():find("axe") and not itemName:lower():find("pickaxe") then
+                                                local axeData = ExclusiveItems[itemName]
+                                                if axeData and axeData.index and axeData.index > bestAxeIndex then
+                                                    bestAxeIndex = axeData.index
+                                                    bestAxe = itemObj:getRealName()
+                                                    bestInventoryIndex = inventoryIndex
                                                 end
                                             end
                                         end
-                                        
-                                        if playerData.isPickaxeEquipped and not currentEquippedIndex then
-                                            for itemId, itemData in pairs(playerData.inventory.exclusive) do
-                                                local itemObj = Util.itemUtils.createItemFromData(itemData)
-                                                local itemName = itemObj:getName()
-                                                if itemName:lower():find("pickaxe") then
-                                                    currentEquippedIndex = itemId
-                                                    break
+                                        if bestInventoryIndex and not playerData.isAxeEquipped then
+                                            local currentEquippedIndex = nil
+                                            if playerData.isFishingRodEquipped then
+                                                for itemId, itemData in pairs(playerData.inventory.exclusive) do
+                                                    local itemObj = Util.itemUtils.createItemFromData(itemData)
+                                                    local itemName = itemObj:getName()
+                                                    if itemName:lower():find("fishingrod") then
+                                                        currentEquippedIndex = itemId
+                                                        break
+                                                    end
                                                 end
                                             end
-                                        end
-                                        
-                                        if currentEquippedIndex then
-                                            InventoryService:useItem(currentEquippedIndex, {use=1})
+                                            if playerData.isPickaxeEquipped and not currentEquippedIndex then
+                                                for itemId, itemData in pairs(playerData.inventory.exclusive) do
+                                                    local itemObj = Util.itemUtils.createItemFromData(itemData)
+                                                    local itemName = itemObj:getName()
+                                                    if itemName:lower():find("pickaxe") then
+                                                        currentEquippedIndex = itemId
+                                                        break
+                                                    end
+                                                end
+                                            end
+                                            if currentEquippedIndex then
+                                                InventoryService:useItem(currentEquippedIndex, {use=1})
+                                                task.wait(1)
+                                            end
+                                            InventoryService:useItem(bestInventoryIndex, {use=1})
                                             task.wait(1)
                                         end
 
-                                        InventoryService:useItem(bestInventoryIndex, {use=1})
-                                        task.wait(1)
-                                    end
-                                end)
-                                
-                                -- Tree cutting logic with controller simulation
-                                local treeControllerThread = task.spawn(function()
-                                    local function simulateClickOnClosestTree()
-                                        pcall(function()
-                                            local originalGetRay = TreeController.getRay
-                                            TreeController.getRay = function(self, _, _) return true end
+                                        -- Get player position
+                                        local playerPosition = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.Position
+                                        if not playerPosition then return end
 
-                                            local originalGetTreeFromRayResult = TreeController.getTreeFromRayResult
-                                            local targetTree = nil
+                                        -- Get latest data
+                                        local data = DataController:getData()
+                                        if not data or not data.trees then return end
 
-                                            TreeController.getTreeFromRayResult = function(_, _) return targetTree end
-
-                                            if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                                                TreeController.getRay = originalGetRay
-                                                TreeController.getTreeFromRayResult = originalGetTreeFromRayResult
-                                                return
+                                        -- Find weakest tree (lowest HP)
+                                        local lowestHP = math.huge
+                                        local targetTreeInstance = nil
+                                        local targetGroup = nil
+                                        local targetId = nil
+                                        for _, groupId in ipairs(treesToCut) do
+                                            if data.trees[groupId] then
+                                                local activeTrees = getActiveTreesInGroup(groupId, data)
+                                                for _, treeInfo in ipairs(activeTrees) do
+                                                    if treeInfo.hp > 0 and treeInfo.hp < lowestHP then
+                                                        lowestHP = treeInfo.hp
+                                                        targetTreeInstance = treeInfo.instance
+                                                        targetGroup = groupId
+                                                        targetId = treeInfo.treeId
+                                                    end
+                                                end
                                             end
+                                        end
 
-                                            local data = DataController:getData()
-                                            if not data or not data.trees then
-                                                TreeController.getRay = originalGetRay
-                                                TreeController.getTreeFromRayResult = originalGetTreeFromRayResult
-                                                return
+                                        -- Teleport to weakest tree
+                                        if targetTreeInstance then
+                                            local model = targetTreeInstance:FindFirstChildWhichIsA("Model")
+                                            if model and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                                                LocalPlayer.Character.HumanoidRootPart.CFrame = model:GetPivot() + Vector3.new(2, 1, 0)
+                                                task.wait(1)
+                                                playerPosition = LocalPlayer.Character.HumanoidRootPart.Position
                                             end
+                                        end
 
-                                            local treesToCut = {"spawn", "desert", "nuclear"}
-                                            local closestDistance = math.huge
-                                            local playerPosition = LocalPlayer.Character.HumanoidRootPart.Position
-
-                                            for _, groupId in ipairs(treesToCut) do
-                                                if data.trees[groupId] then
-                                                    for _, tree in pairs(CollectionService:GetTagged("Tree")) do
-                                                        local model = tree:FindFirstChildWhichIsA("Model")
-                                                        if not model then continue end
-
-                                                        local treeGroupId = tree:GetAttribute("groupId")
-                                                        local treeId = tree:GetAttribute("treeId")
-
-                                                        if treeGroupId == groupId and treeId and 
-                                                        data.trees[groupId][treeId] and 
-                                                        data.trees[groupId][treeId].hp > 0 and
-                                                        not data.trees[groupId][treeId].respawn then
-
-                                                            local primaryPart = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
-                                                            if primaryPart then
-                                                                local distance = (primaryPart.Position - playerPosition).Magnitude
-                                                                if distance < closestDistance then
-                                                                    closestDistance = distance
-                                                                    targetTree = tree
-                                                                end
+                                        -- Find closest tree after teleport
+                                        local closestTree, closestDistance = nil, math.huge
+                                        for _, groupId in ipairs(treesToCut) do
+                                            if data.trees[groupId] then
+                                                for _, tree in pairs(CollectionService:GetTagged("Tree")) do
+                                                    local model = tree:FindFirstChildWhichIsA("Model")
+                                                    if not model then continue end
+                                                    local treeGroupId = tree:GetAttribute("groupId")
+                                                    local treeId = tree:GetAttribute("treeId")
+                                                    if treeGroupId == groupId and treeId and data.trees[groupId][treeId] and data.trees[groupId][treeId].hp > 0 and not data.trees[groupId][treeId].respawn then
+                                                        local primaryPart = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
+                                                        if primaryPart then
+                                                            local distance = (primaryPart.Position - playerPosition).Magnitude
+                                                            if distance < closestDistance then
+                                                                closestDistance = distance
+                                                                closestTree = tree
                                                             end
                                                         end
                                                     end
                                                 end
                                             end
-
-                                            if not targetTree then
-                                                TreeController.getRay = originalGetRay
-                                                TreeController.getTreeFromRayResult = originalGetTreeFromRayResult
-                                                return
-                                            end
-
-                                            TreeController:sendRayFromInput(0, 0)
-                                            TreeController.getRay = originalGetRay
-                                            TreeController.getTreeFromRayResult = originalGetTreeFromRayResult
-                                        end)
-                                    end
-
-                                    while seasonQuestEnabled and _G.CurrentResourceQuest == "tree" do
-                                        simulateClickOnClosestTree()
-                                        task.wait(1)
-                                    end
-                                end)
-
-                                -- Tree teleportation thread - teleports to lowest HP tree every 5 seconds
-                                local teleportThread = task.spawn(function()
-                                    local treesToCut = {"spawn", "desert", "nuclear"}
-                                    local lumberId = getLumberId()
-
-                                    while seasonQuestEnabled and _G.CurrentResourceQuest == "tree" do
-                                        local data = DataController:getData()
-                                        
-                                        if data and data.trees then
-                                            -- Find tree with lowest HP across all groups
-                                            local lowestHP = math.huge
-                                            local targetGroup = nil
-                                            local targetId = nil
-                                            local targetInstance = nil
-                                            
-                                            for _, groupId in ipairs(treesToCut) do
-                                                if data.trees[groupId] then
-                                                    local activeTrees = getActiveTreesInGroup(groupId, data)
-                                                    for _, treeInfo in ipairs(activeTrees) do
-                                                        if treeInfo.hp > 0 and treeInfo.hp < lowestHP then
-                                                            lowestHP = treeInfo.hp
-                                                            targetGroup = groupId
-                                                            targetId = treeInfo.treeId
-                                                            targetInstance = treeInfo.instance
-                                                        end
-                                                    end
-                                                end
-                                            end
-                                            
-                                            -- Teleport to lowest HP tree
-                                            if targetGroup and targetId and targetInstance then
-                                                pcall(function()
-                                                    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                                                        local model = targetInstance:FindFirstChildWhichIsA("Model")
-                                                        if model then
-                                                            LocalPlayer.Character.HumanoidRootPart.CFrame = model:GetPivot() + Vector3.new(0, 1, 0)
-                                                        end
-                                                    end
-                                                end)
-                                            end
-                                            
-                                            -- Damage current tree
-                                            if targetGroup and targetId then
-                                                TreeService.damage2:Fire(targetGroup, targetId, lumberId)
-                                            end
                                         end
 
-                                        task.wait(1) -- Check for new lowest HP tree every 5 seconds
-                                    end
-                                end)
+                                        -- Raycast and damage closest tree
+                                        if closestTree then
+                                            pcall(function()
+                                                local originalGetRay = TreeController.getRay
+                                                TreeController.getRay = function(self, _, _) return true end
+                                                local originalGetTreeFromRayResult = TreeController.getTreeFromRayResult
+                                                TreeController.getTreeFromRayResult = function(_, _) return closestTree end
+                                                TreeController:sendRayFromInput(0, 0)
+                                                TreeController.getRay = originalGetRay
+                                                TreeController.getTreeFromRayResult = originalGetTreeFromRayResult
+                                            end)
+                                            -- Damage tree
+                                            local treeGroupId = closestTree:GetAttribute("groupId")
+                                            local treeId = closestTree:GetAttribute("treeId")
+                                            local lumberId = getLumberId()
+                                            if treeGroupId and treeId and lumberId then
+                                                TreeService.damage2:Fire(treeGroupId, treeId, lumberId)
+                                            end
+                                        end
+                                    end)
+                                    task.wait(1)
+                                end
                             end))
 
 
