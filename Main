@@ -4988,7 +4988,7 @@ end)
                     end
                 else
                     local freeTiersComplete = true
-                    for tier = 1, 12 do
+                    for tier = 1, 14 do
                         if tier > currentPassLevel then
                             freeTiersComplete = false
                             resetReason = string.format("Not enough level (at %d/12)", currentPassLevel)
