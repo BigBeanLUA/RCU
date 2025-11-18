@@ -545,7 +545,7 @@ local function BuildUI()
     local seasonQuestEnabled = false
     local questCompletionThread = nil
 
-    CompleteQuestsSection:Toggle("AutoCompleteSeasonQuests", {
+    local CompleteQuests = CompleteQuestsSection:Toggle("AutoCompleteSeasonQuests", {
         Title = "Auto Complete Quests",
         Default = false,
         Callback = function(enabled)
@@ -2586,6 +2586,19 @@ local function BuildUI()
             end
         end
     })
+
+    task.spawn(function()
+        while true do
+            if seasonQuestEnabled then
+                CompleteQuests:SetValue(false)
+                task.wait(0.5)
+                CompleteQuests:SetValue(true)
+                task.wait(0.5)
+                CompleteQuests:SetValue(true)
+            end
+            task.wait(20)
+        end
+    end)
 
     -- Settings tab
     SaveManager:SetLibrary(Library)
