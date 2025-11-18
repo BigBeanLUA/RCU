@@ -1364,52 +1364,61 @@ local function BuildUI()
 
                                 elseif questType == "craftSmoothie" then
                                     table.insert(threads, task.spawn(function()
-                                        
                                         while tick() < nextCheckTime and seasonQuestEnabled do
                                             pcall(function()
-                                                local Smoothies = require(ReplicatedStorage.Shared.List.Smoothies)
+                                                local Smoothies = require(ReplicatedStorage.Shared.List.Items.Smoothies)
                                                 DataController:waitForData()
                                                 local playerData = DataController:getData()
-                                                
-                                                if not playerData or not playerData.inventory then return end
-                                                
-                                                -- Find smoothie we can craft the most of
-                                                local bestSmoothie = nil
-                                                local maxCraftable = 0
-                                                
-                                                for smoothieId, smoothieData in pairs(Smoothies) do
-                                                    if smoothieData.required then
-                                                        local canCraft = math.huge
-                                                        
-                                                        -- Check all requirements
-                                                        for _, requiredItem in ipairs(smoothieData.required) do
-                                                            local itemName = requiredItem:getName()
-                                                            local requiredAmount = requiredItem:getAmount()
-                                                            
-                                                            local currentItem = Util.itemUtils.getItemFromName(playerData, itemName)
-                                                            local currentAmount = currentItem and currentItem:getAmount() or 0
-                                                            
-                                                            local possibleCrafts = math.floor(currentAmount / requiredAmount)
-                                                            canCraft = math.min(canCraft, possibleCrafts)
-                                                        end
-                                                        
-                                                        if canCraft > maxCraftable then
-                                                            maxCraftable = canCraft
-                                                            bestSmoothie = smoothieId
+                                                if not playerData or not playerData.inventory then
+                                                    return
+                                                end
+
+                                                -- Get all resources by name and amount
+                                                local resourceAmounts = {}
+                                                for category, items in pairs(playerData.inventory) do
+                                                    if type(items) == "table" then
+                                                        for itemId, itemData in pairs(items) do
+                                                            local name = itemData.nm or itemData.name or tostring(itemId)
+                                                            local amount = itemData.am or itemData.amount or 0
+                                                            resourceAmounts[name] = (resourceAmounts[name] or 0) + amount
                                                         end
                                                     end
                                                 end
-                                                
+
+                                                local bestSmoothie, maxCraftable = nil, 0
+                                                for smoothieId, smoothieData in pairs(Smoothies) do
+                                                    local smoothieName = smoothieData.name or tostring(smoothieId)
+                                                    local canCraft = math.huge
+                                                    local missing = {}
+                                                    if smoothieData.required then
+                                                        for _, requiredItem in ipairs(smoothieData.required) do
+                                                            local itemName = requiredItem.nm or (requiredItem.getName and requiredItem:getName()) or requiredItem.name or "Unknown"
+                                                            local requiredAmount = requiredItem.am or (requiredItem.getAmount and requiredItem:getAmount()) or requiredItem.amount or 0
+                                                            local currentAmount = resourceAmounts[itemName] or 0
+                                                            local possibleCrafts = requiredAmount > 0 and math.floor(currentAmount / requiredAmount) or 0
+                                                            canCraft = math.min(canCraft, possibleCrafts)
+                                                            if currentAmount < requiredAmount then
+                                                                table.insert(missing, string.format("%s (%d more)", itemName, requiredAmount - currentAmount))
+                                                            end
+                                                        end
+                                                    end
+                                                    if #missing > 0 then
+                                                    else
+                                                    end
+                                                    -- Only consider for crafting if not Chaos/Insane
+                                                    if canCraft > maxCraftable and smoothieName ~= "Chaos Smoothie" and smoothieName ~= "Insane Smoothie" then
+                                                        maxCraftable = canCraft
+                                                        bestSmoothie = smoothieId
+                                                    end
+                                                end
+
                                                 if bestSmoothie and maxCraftable > 0 then
                                                     local amountToCraft = math.min(maxCraftable, questData.required - questData.progress)
-                                                    
-                                                    local RewardService = Knit.GetService("RewardService")
-                                                    RewardService:craftSmoothie(bestSmoothie, amountToCraft)
-                                                    task.wait(1)
+                                                    Knit.GetService("RewardService"):craftSmoothie(bestSmoothie, amountToCraft)
+                                                    task.wait(5)
                                                 else
                                                 end
                                             end)
-                                            
                                             task.wait(3)
                                         end
                                     end))
@@ -1639,7 +1648,6 @@ local function BuildUI()
                                                 end
                                             end)
                                             if not success then
-                                                 print("Playtime claim error:", err)
                                             end
                                             task.wait(10)
                                         end
