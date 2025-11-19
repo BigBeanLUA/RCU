@@ -643,6 +643,7 @@ BuildUI = function()
         end
     })
 
+    
     HideAnimationToggle = EggHatchingSection:Toggle("HideHatchAnimation", {
         Title = "Hide Hatch Animation", Default = false,
         Callback = function(Value)
@@ -1122,8 +1123,11 @@ BuildUI = function()
 
                                 if itemName:lower():find("axe") and not itemName:lower():find("pickaxe") then
                                     local axeData = ExclusiveItems[itemName]
-                                    if axeData and axeData.index and axeData.index > bestAxeIndex then
-                                        bestAxeIndex = axeData.index
+                                    -- Handle items with or without index
+                                    local currentIndex = (axeData and axeData.index) or 999999 -- Give items without index highest priority
+                                    
+                                    if currentIndex > bestAxeIndex then
+                                        bestAxeIndex = currentIndex
                                         bestAxe = itemObj:getRealName()
                                         bestInventoryIndex = inventoryIndex
                                     end
@@ -1176,7 +1180,8 @@ BuildUI = function()
                                     local itemObj = Util.itemUtils.createItemFromData(itemData)
                                     if itemObj:getName():lower():find("axe") and not itemObj:getName():lower():find("pickaxe") then
                                         currentAxe = itemObj:getRealName()
-                                        currentAxeIndex = itemObj:directory()[itemObj:getName()].index
+                                        local axeData = itemObj:directory()[itemObj:getName()]
+                                        currentAxeIndex = (axeData and axeData.index) or 999999
                                         currentInventoryIndex = inventoryIndex
                                         break
                                     end
