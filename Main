@@ -1112,29 +1112,22 @@ BuildUI = function()
                 task.spawn(function()
                     while isAutoEquipAxeEnabled do
                         pcall(function()
-                            local ExclusiveItems = require(ReplicatedStorage.Shared.List.Items.Exclusive)
                             DataController:waitForData()
                             local playerData = DataController:getData()
 
-                            local bestAxe, bestAxeIndex, bestInventoryIndex = nil, 0, nil
+                            local axeInventoryIndex = nil
                             for inventoryIndex, itemData in pairs(playerData.inventory.exclusive) do
                                 local itemObj = Util.itemUtils.createItemFromData(itemData)
                                 local itemName = itemObj:getName()
 
+                                -- Check if it's an axe (has "axe" but not "pickaxe")
                                 if itemName:lower():find("axe") and not itemName:lower():find("pickaxe") then
-                                    local axeData = ExclusiveItems[itemName]
-                                    -- Handle items with or without index
-                                    local currentIndex = (axeData and axeData.index) or 999999 -- Give items without index highest priority
-                                    
-                                    if currentIndex > bestAxeIndex then
-                                        bestAxeIndex = currentIndex
-                                        bestAxe = itemObj:getRealName()
-                                        bestInventoryIndex = inventoryIndex
-                                    end
+                                    axeInventoryIndex = inventoryIndex
+                                    break
                                 end
                             end
 
-                            if not bestAxe then return end
+                            if not axeInventoryIndex then return end
 
                             local isAxeEquipped = playerData.isAxeEquipped
 
@@ -1172,24 +1165,8 @@ BuildUI = function()
                                     task.wait(1)
                                 end
                                 
-                                -- Equip best axe
-                                InventoryService:useItem(bestInventoryIndex)
-                            else
-                                local currentAxe, currentAxeIndex, currentInventoryIndex = nil, 0, nil
-                                for inventoryIndex, itemData in pairs(playerData.inventory.exclusive) do
-                                    local itemObj = Util.itemUtils.createItemFromData(itemData)
-                                    if itemObj:getName():lower():find("axe") and not itemObj:getName():lower():find("pickaxe") then
-                                        currentAxe = itemObj:getRealName()
-                                        local axeData = itemObj:directory()[itemObj:getName()]
-                                        currentAxeIndex = (axeData and axeData.index) or 999999
-                                        currentInventoryIndex = inventoryIndex
-                                        break
-                                    end
-                                end
-
-                                if not (currentAxeIndex == bestAxeIndex and currentInventoryIndex == bestInventoryIndex) then
-                                    InventoryService:useItem(bestInventoryIndex)
-                                end
+                                -- Equip the axe
+                                InventoryService:useItem(axeInventoryIndex)
                             end
                         end)
 
