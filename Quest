@@ -545,7 +545,7 @@ CompleteQuestsSection:Paragraph("MainScriptWarning", {
     Title = "Important!",
     Content = [[
 Auto Fish, Auto Cut Trees, Auto Mining, and Auto Hatch must be turned OFF in the main script for this to work properly.
-If any of these are enabled, the script won't work properly... ALSO set auto rejoin to 20 minutes if you want the best results with the claim playtime rewards stuff.]]})
+If any of these are enabled, the script won't work properly... ALSO set auto rejoin to 20 minutes (1200 seconds) if you want the best results with the claim playtime rewards stuff.]]})
 
     -- Auto Complete Season Quests Toggle
     local seasonQuestEnabled = false
