@@ -206,34 +206,28 @@ BuildUI = function()
                 task.spawn(function()
                     while isAutoEquipRodEnabled do
                         pcall(function()
-                            local ExclusiveItems = require(ReplicatedStorage.Shared.List.Items.Exclusive)
                             DataController:waitForData()
                             local playerData = DataController:getData()
 
-                            local bestRod, bestRodIndex, bestRodId = nil, 0, nil
+                            local rodInventoryId = nil
                             for itemId, itemData in pairs(playerData.inventory.exclusive) do
                                 local itemObj = Util.itemUtils.createItemFromData(itemData)
                                 local itemName = itemObj:getName()
 
-                                if itemName:lower():find("fishingrod") then
-                                    local rodData = ExclusiveItems[itemName]
-                                    if rodData and rodData.index and rodData.index > bestRodIndex then
-                                        bestRodIndex = rodData.index
-                                        bestRod = itemObj:getRealName()
-                                        bestRodId = itemId 
-                                    end
+                                -- Check if it's a fishing rod
+                                if itemName:lower():find("fishingrod") or itemName:lower():find("rod") then
+                                    rodInventoryId = itemId
+                                    break
                                 end
                             end
 
-                            if not bestRod then
-                                return
-                            end
+                            if not rodInventoryId then return end
 
                             local isRodEquipped = playerData.isFishingRodEquipped
 
                             if not isRodEquipped then
                                 -- Find and unequip currently equipped item first
-                                local currentEquippedIndex = nil
+                                local currentEquippedId = nil
                                 
                                 -- Check if axe is equipped
                                 if playerData.isAxeEquipped then
@@ -241,49 +235,34 @@ BuildUI = function()
                                         local itemObj = Util.itemUtils.createItemFromData(itemData)
                                         local itemName = itemObj:getName()
                                         if itemName:lower():find("axe") and not itemName:lower():find("pickaxe") then
-                                            currentEquippedIndex = itemId
+                                            currentEquippedId = itemId
                                             break
                                         end
                                     end
                                 end
                                 
                                 -- Check if pickaxe is equipped
-                                if playerData.isPickaxeEquipped and not currentEquippedIndex then
+                                if playerData.isPickaxeEquipped and not currentEquippedId then
                                     for itemId, itemData in pairs(playerData.inventory.exclusive) do
                                         local itemObj = Util.itemUtils.createItemFromData(itemData)
                                         local itemName = itemObj:getName()
                                         if itemName:lower():find("pickaxe") then
-                                            currentEquippedIndex = itemId
+                                            currentEquippedId = itemId
                                             break
                                         end
                                     end
                                 end
                                 
                                 -- Unequip current item if found
-                                if currentEquippedIndex then
+                                if currentEquippedId then
                                     local Knit = require(game:GetService("ReplicatedStorage").Packages.Knit.KnitClient)
-                                    Knit.GetService("InventoryService"):useItem(currentEquippedIndex, {use=1})
+                                    Knit.GetService("InventoryService"):useItem(currentEquippedId, {use=1})
                                     task.wait(1)
                                 end
                                 
-                                -- Equip best rod
+                                -- Equip the rod
                                 local Knit = require(game:GetService("ReplicatedStorage").Packages.Knit.KnitClient)
-                                Knit.GetService("InventoryService"):useItem(bestRodId, {use=1})
-                            else
-                                local currentRod, currentRodIndex, currentRodId = nil, 0, nil
-                                for itemId, itemData in pairs(playerData.inventory.exclusive) do
-                                    local itemObj = Util.itemUtils.createItemFromData(itemData)
-                                    if itemObj:getName():lower():find("fishingrod") then
-                                        currentRod = itemObj:getRealName()
-                                        currentRodIndex = itemObj:directory()[itemObj:getName()].index
-                                        currentRodId = itemId
-                                        break
-                                    end
-                                end
-                                if not (currentRodIndex == bestRodIndex and currentRodId == bestRodId) then
-                                    local Knit = require(game:GetService("ReplicatedStorage").Packages.Knit.KnitClient)
-                                    Knit.GetService("InventoryService"):useItem(bestRodId, {use=1})
-                                end
+                                Knit.GetService("InventoryService"):useItem(rodInventoryId, {use=1})
                             end
                         end)
 
@@ -296,6 +275,8 @@ BuildUI = function()
             end
         end
     })
+
+
 
     task.spawn(function()
         while true do
