@@ -546,7 +546,7 @@ BuildUI = function()
     isAutoEquipPickaxeEnabled = false
     AutoEquipPickaxe = AutoMineSection:Toggle("AutoEquipBestPickaxe", {
         Title = "Auto Equip Best Pickaxe",
-        Description = "Automatically equips the best pickaxe you own -- You cant have anything equipped before hand (e.g. a normal axe for trees).",
+        Description = "Automatically equips the best pickaxe you own.",
         Default = false,
         Callback = function(enabled)
             isAutoEquipPickaxeEnabled = enabled
@@ -554,26 +554,22 @@ BuildUI = function()
                 task.spawn(function()
                     while isAutoEquipPickaxeEnabled do
                         pcall(function()
-                            local ExclusiveItems = require(ReplicatedStorage.Shared.List.Items.Exclusive)
                             DataController:waitForData()
                             local playerData = DataController:getData()
 
-                            local bestPickaxe, bestPickaxeIndex, bestInventoryIndex = nil, 0, nil
+                            local pickaxeInventoryIndex = nil
                             for inventoryIndex, itemData in pairs(playerData.inventory.exclusive) do
                                 local itemObj = Util.itemUtils.createItemFromData(itemData)
                                 local itemName = itemObj:getName()
 
+                                -- Check if it's a pickaxe
                                 if itemName:lower():find("pickaxe") then
-                                    local pickaxeData = ExclusiveItems[itemName]
-                                    if pickaxeData and pickaxeData.index and pickaxeData.index > bestPickaxeIndex then
-                                        bestPickaxeIndex = pickaxeData.index
-                                        bestPickaxe = itemObj:getRealName()
-                                        bestInventoryIndex = inventoryIndex
-                                    end
+                                    pickaxeInventoryIndex = inventoryIndex
+                                    break
                                 end
                             end
 
-                            if not bestPickaxe then return end
+                            if not pickaxeInventoryIndex then return end
 
                             local isPickaxeEquipped = playerData.isPickaxeEquipped
 
@@ -611,22 +607,8 @@ BuildUI = function()
                                     task.wait(1)
                                 end
 
-                                InventoryService:useItem(bestInventoryIndex)
-                            else
-                                local currentPickaxe, currentPickaxeIndex, currentInventoryIndex = nil, 0, nil
-                                for inventoryIndex, itemData in pairs(playerData.inventory.exclusive) do
-                                    local itemObj = Util.itemUtils.createItemFromData(itemData)
-                                    if itemObj:getName():lower():find("pickaxe") then
-                                        currentPickaxe = itemObj:getRealName()
-                                        currentPickaxeIndex = itemObj:directory()[itemObj:getName()].index
-                                        currentInventoryIndex = inventoryIndex
-                                        break
-                                    end
-                                end
-
-                                if not (currentPickaxeIndex == bestPickaxeIndex and currentInventoryIndex == bestInventoryIndex) then
-                                    InventoryService:useItem(bestInventoryIndex)
-                                end
+                                -- Equip the pickaxe
+                                InventoryService:useItem(pickaxeInventoryIndex)
                             end
                         end)
 
@@ -639,7 +621,7 @@ BuildUI = function()
             end
         end
     })
-
+    
     task.spawn(function()
         while true do
             if AutoMine.Value == false then
