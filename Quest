@@ -1298,7 +1298,7 @@ local function BuildUI()
                                                     local remaining = questData.required - questData.progress
                                                     local amountToUse = math.min(remaining, playerData.inventory.potion[bestPotion].am)
                                                     InventoryService:useItem(bestPotion, {use = amountToUse})
-                                                    task.wait(0.5)
+                                                    task.wait(5)
                                                 else
                                                     break
                                                 end
@@ -1625,7 +1625,7 @@ local function BuildUI()
                                                             local remaining = questData.required - questData.progress
                                                             local amountToUse = math.min(remaining, fruitData.am)
                                                             InventoryService:useItem(fruitId, {use = amountToUse})
-                                                            task.wait(0.5)
+                                                            task.wait(5)
                                                             foundFruit = true
                                                             break
                                                         end
@@ -1634,7 +1634,7 @@ local function BuildUI()
                                                             local remaining = questData.required - questData.progress
                                                             local amountToUse = math.min(remaining, fruitData.am)
                                                             InventoryService:useItem(fruitId, {use = amountToUse})
-                                                            task.wait(0.5)
+                                                            task.wait(5)
                                                             foundFruit = true
                                                             break
                                                         end
