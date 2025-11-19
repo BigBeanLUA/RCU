@@ -662,20 +662,18 @@ BuildUI = function()
         end
     })
 
-    -- Hand the library over to our managers
     SaveManager:SetLibrary(Library)
     InterfaceManager:SetLibrary(Library)
     SaveManager:IgnoreThemeSettings()
     SaveManager:SetIgnoreIndexes{}
     InterfaceManager:SetFolder("FluentScriptHub")
-    SaveManager:SetFolder("FluentScriptHub/RCU-fish")
+    SaveManager:SetFolder("FluentScriptHub/RCU-fish") -- Set once for this script
+
     InterfaceManager:BuildInterfaceSection(Tabs.Settings)
     SaveManager:BuildConfigSection(Tabs.Settings)
 
-    
     Window:SelectTab(1)
     SaveManager:LoadAutoloadConfig()
-    SaveManager:SetFolder("FluentSettings/Fish")
 end
 
 task.spawn(function()
