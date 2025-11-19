@@ -2017,6 +2017,17 @@ BuildUI = function()
     })
 
 
+    machines:Toggle("AutoLoadMachine", {
+    Title = "Auto Load Machine Script",
+    Description = "Automatically loads the machine script when you load this script. Use this if you have auto load config on.",
+    Default = false,
+    Callback = function(enabled)
+        AutoLoadSeasonQuest1 = enabled
+        if enabled then
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/BigBeanLUA/RCU/refs/heads/main/Machine"))()
+        end
+    end})
+
     -- Function to check if player is in dungeon
     local function isInDungeon()
         local success, result = pcall(function()
@@ -3102,6 +3113,17 @@ BuildUI = function()
     })
 
 
+    SeasonQuest:Toggle("AutoLoadSeasonQuest", {
+    Title = "Auto Load Season Quest",
+    Description = "Automatically loads the Season Quest script when you load this script. Use this if you have auto load config on.",
+    Default = false,
+    Callback = function(enabled)
+        AutoLoadSeasonQuest = enabled
+        if enabled then
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/BigBeanLUA/RCU/refs/heads/main/Quest"))()
+        end
+    end})
+
         
     local MapQuestSection = Tabs.Quest:AddSection("Map Quests")
 
@@ -4018,6 +4040,16 @@ end)
         end
     })
 
+    minescript:Toggle("AutoLoadMine", {
+    Title = "Auto Load Mining Script",
+    Description = "Automatically loads the mining script when you load this script. Use this if you have auto load config on.",
+    Default = false,
+    Callback = function(enabled)
+        AutoLoadSeasonQuest3 = enabled
+        if enabled then
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/BigBeanLUA/RCU/refs/heads/main/Mine"))()
+        end
+    end})
 
     fishscript = Tabs.Fish:AddSection("Fishing Script")
     
@@ -4028,6 +4060,17 @@ end)
             loadstring(game:HttpGet("https://raw.githubusercontent.com/BigBeanLUA/RCU/refs/heads/main/Fish"))()
         end
     })
+
+    fishscript:Toggle("AutoLoadFish", {
+    Title = "Auto Load Fish Script",
+    Description = "Automatically loads the fish script when you load this script. Use this if you have auto load config on.",
+    Default = false,
+    Callback = function(enabled)
+        AutoLoadSeasonQuest2 = enabled
+        if enabled then
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/BigBeanLUA/RCU/refs/heads/main/Fish"))()
+        end
+    end})
 
     ClaimSection = Tabs.Claim:AddSection("Claim/Collect")
 
@@ -4073,14 +4116,13 @@ end)
             end
         end
 
-        local function getZonePrompts(chestFolder)
+        local function getZonePrompts(zoneFolder)
             local prompts = {}
-            for _, chest in ipairs(chestFolder:GetChildren()) do
-                local touch = chest:FindFirstChild("Touch")
-                if touch then
-                    local prompt = touch:FindFirstChildOfClass("ProximityPrompt")
-                    if prompt and prompt.Enabled then
-                        table.insert(prompts, prompt)
+            for _, obj in ipairs(zoneFolder:GetDescendants()) do
+                if obj:IsA("ProximityPrompt") and obj.Enabled then
+                    local parent = obj.Parent
+                    if parent and parent.Name == "Touch" then
+                        table.insert(prompts, obj)
                     end
                 end
             end
@@ -4098,14 +4140,12 @@ end)
             -- Filter zones based on selection
             local zonesToCollect = {}
             if next(selectedZones) then
-                -- If zones are selected, only collect from those
                 for _, zoneData in ipairs(unlockedZones) do
                     if selectedZones[zoneData.name] then
                         table.insert(zonesToCollect, zoneData)
                     end
                 end
             else
-                -- If no zones selected, collect from all unlocked zones
                 zonesToCollect = unlockedZones
             end
 
@@ -4116,8 +4156,6 @@ end)
                 local zoneName = formatZoneName(zoneData.name)
                 local mapFolder = Workspace:FindFirstChild("Game") and Workspace.Game.Maps:FindFirstChild(zoneName)
                 if not mapFolder then continue end
-                local chestFolder = mapFolder:FindFirstChild("MiniChests")
-                if not chestFolder then continue end
 
                 humanoidRootPart:PivotTo(zoneData.cframe)
                 task.wait(2)
@@ -4127,7 +4165,7 @@ end)
                 local noPromptCount = 0
 
                 while isAutoCollectEnabled do
-                    local prompts = getZonePrompts(chestFolder)
+                    local prompts = getZonePrompts(mapFolder)
                     local currentCount = #prompts
 
                     if currentCount == lastCount then
@@ -4226,7 +4264,6 @@ end)
             end
         end
     })
-
 
     ClaimSection:Toggle("AutoPickUp", { Title = "Auto Pick Up", Default = false,
         Callback = function(enabled)
@@ -5316,16 +5353,18 @@ end)
             end
         end
     })
-
-    -- Hand the library over to our managers
     SaveManager:SetLibrary(Library)
     InterfaceManager:SetLibrary(Library)
     SaveManager:IgnoreThemeSettings()
     SaveManager:SetIgnoreIndexes{}
     InterfaceManager:SetFolder("FluentScriptHub")
-    SaveManager:SetFolder("FluentScriptHub/specific-game")
+    SaveManager:SetFolder("FluentScriptHub/RCU-main") -- Set once for this script
+
     InterfaceManager:BuildInterfaceSection(Tabs.Settings)
     SaveManager:BuildConfigSection(Tabs.Settings)
+
+    Window:SelectTab(1)
+    SaveManager:LoadAutoloadConfig()
 
     local usercountsection = Tabs.Settings:AddSection("User Count")
 
@@ -5378,9 +5417,6 @@ end)
         end
     end)
 
-
-    Window:SelectTab(1)
-    SaveManager:LoadAutoloadConfig()
 end
 
 task.spawn(function()
