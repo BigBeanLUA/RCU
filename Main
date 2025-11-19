@@ -154,7 +154,7 @@ BuildUI = function()
 
     PrivateServerSection:Paragraph("PrivateServerInfo", {
         Title = "How to Get Private Server ID",
-        Content = "To join a private server, copy the Roblox invite link and paste the ID below.\nExample: https://www.roblox.com/share?code=12345&type=Server\nThe ID is: 12345\nEnter 12345 in the 'Private Server ID' input."
+        Content = "To join a private server, copy the Roblox invite link and paste the ID below.\nExample: https://www.roblox.com/share?code=12345&type=Server\nThe ID is: 12345\nEnter 12345 in the 'Private Server ID' input. Or if your lazy, just paste the whole link in the input."
     })
 
     local privateServerIdInput = PrivateServerSection:AddInput("PrivateServerID", {
@@ -168,6 +168,16 @@ BuildUI = function()
         Default = "3600",
         Numeric = true,
     })
+
+    local function extractPrivateServerId(input)
+        -- If input is a full URL, extract the code
+        local code = tostring(input)
+        local match = code:match("code=([%w]+)")
+        if match then
+            return match
+        end
+        return code
+    end
 
     local AutoRejoinPrivateToggle = PrivateServerSection:Toggle("AutoRejoinPrivate", {
         Title = "Auto Rejoin",
@@ -183,7 +193,8 @@ BuildUI = function()
                 _G.AutoRejoinPrivateThread = task.spawn(function()
                     while _G.AutoRejoinPrivateEnabled do
                         local delay = tonumber(privateDelayInput.Value) or 10
-                        local accessCode = tostring(privateServerIdInput.Value)
+                        local rawInput = tostring(privateServerIdInput.Value)
+                        local accessCode = extractPrivateServerId(rawInput)
                         task.wait(delay)
                         if accessCode ~= "" then
                             local teleportOptions = Instance.new("TeleportOptions")
