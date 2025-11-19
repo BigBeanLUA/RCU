@@ -763,50 +763,56 @@ If any of these are enabled, the script won't work properly...]]})
                                 local treesToCut = {"spawn", "desert", "nuclear"}
                                 while seasonQuestEnabled and _G.CurrentResourceQuest == "tree" do
                                     pcall(function()
-                                        -- Equip best axe if not equipped
-                                        local ExclusiveItems = require(ReplicatedStorage.Shared.List.Items.Exclusive)
+                                        -- Equip axe if not equipped
                                         local playerData = DataController:getData()
-                                        local bestAxe, bestAxeIndex, bestInventoryIndex = nil, 0, nil
-                                        for inventoryIndex, itemData in pairs(playerData.inventory.exclusive) do
-                                            local itemObj = Util.itemUtils.createItemFromData(itemData)
-                                            local itemName = itemObj:getName()
-                                            if itemName:lower():find("axe") and not itemName:lower():find("pickaxe") then
-                                                local axeData = ExclusiveItems[itemName]
-                                                if axeData and axeData.index and axeData.index > bestAxeIndex then
-                                                    bestAxeIndex = axeData.index
-                                                    bestAxe = itemObj:getRealName()
-                                                    bestInventoryIndex = inventoryIndex
+                                        
+                                        if not playerData.isAxeEquipped then
+                                            local axeInventoryIndex = nil
+                                            for inventoryIndex, itemData in pairs(playerData.inventory.exclusive) do
+                                                local itemObj = Util.itemUtils.createItemFromData(itemData)
+                                                local itemName = itemObj:getName()
+                                                -- Check if it's an axe (has "axe" but not "pickaxe")
+                                                if itemName:lower():find("axe") and not itemName:lower():find("pickaxe") then
+                                                    axeInventoryIndex = inventoryIndex
+                                                    break
                                                 end
                                             end
-                                        end
-                                        if bestInventoryIndex and not playerData.isAxeEquipped then
-                                            local currentEquippedIndex = nil
-                                            if playerData.isFishingRodEquipped then
-                                                for itemId, itemData in pairs(playerData.inventory.exclusive) do
-                                                    local itemObj = Util.itemUtils.createItemFromData(itemData)
-                                                    local itemName = itemObj:getName()
-                                                    if itemName:lower():find("fishingrod") then
-                                                        currentEquippedIndex = itemId
-                                                        break
+                                            
+                                            if axeInventoryIndex then
+                                                -- Unequip currently equipped item first
+                                                local currentEquippedIndex = nil
+                                                
+                                                if playerData.isFishingRodEquipped then
+                                                    for itemId, itemData in pairs(playerData.inventory.exclusive) do
+                                                        local itemObj = Util.itemUtils.createItemFromData(itemData)
+                                                        local itemName = itemObj:getName()
+                                                        if itemName:lower():find("fishingrod") or itemName:lower():find("rod") then
+                                                            currentEquippedIndex = itemId
+                                                            break
+                                                        end
                                                     end
                                                 end
-                                            end
-                                            if playerData.isPickaxeEquipped and not currentEquippedIndex then
-                                                for itemId, itemData in pairs(playerData.inventory.exclusive) do
-                                                    local itemObj = Util.itemUtils.createItemFromData(itemData)
-                                                    local itemName = itemObj:getName()
-                                                    if itemName:lower():find("pickaxe") then
-                                                        currentEquippedIndex = itemId
-                                                        break
+                                                
+                                                if playerData.isPickaxeEquipped and not currentEquippedIndex then
+                                                    for itemId, itemData in pairs(playerData.inventory.exclusive) do
+                                                        local itemObj = Util.itemUtils.createItemFromData(itemData)
+                                                        local itemName = itemObj:getName()
+                                                        if itemName:lower():find("pickaxe") then
+                                                            currentEquippedIndex = itemId
+                                                            break
+                                                        end
                                                     end
                                                 end
-                                            end
-                                            if currentEquippedIndex then
-                                                InventoryService:useItem(currentEquippedIndex, {use=1})
+                                                
+                                                if currentEquippedIndex then
+                                                    InventoryService:useItem(currentEquippedIndex, {use=1})
+                                                    task.wait(1)
+                                                end
+                                                
+                                                -- Equip the axe
+                                                InventoryService:useItem(axeInventoryIndex, {use=1})
                                                 task.wait(1)
                                             end
-                                            InventoryService:useItem(bestInventoryIndex, {use=1})
-                                            task.wait(1)
                                         end
 
                                         -- Get player position
@@ -896,27 +902,23 @@ If any of these are enabled, the script won't work properly...]]})
 
                         elseif _G.CurrentResourceQuest == "fish" and fishQuest then
                             table.insert(threads, task.spawn(function()
-                                -- Fish quest code (same as before)
+                                -- Fish quest code
                                 pcall(function()
-                                    local ExclusiveItems = require(ReplicatedStorage.Shared.List.Items.Exclusive)
                                     local playerData = DataController:getData()
                                     
-                                    local bestRod, bestRodIndex, bestRodId = nil, 0, nil
+                                    local rodInventoryId = nil
                                     for itemId, itemData in pairs(playerData.inventory.exclusive) do
                                         local itemObj = Util.itemUtils.createItemFromData(itemData)
                                         local itemName = itemObj:getName()
                                         
-                                        if itemName:lower():find("fishingrod") then
-                                            local rodData = ExclusiveItems[itemName]
-                                            if rodData and rodData.index and rodData.index > bestRodIndex then
-                                                bestRodIndex = rodData.index
-                                                bestRod = itemObj:getRealName()
-                                                bestRodId = itemId
-                                            end
+                                        -- Check if it's a fishing rod
+                                        if itemName:lower():find("fishingrod") or itemName:lower():find("rod") then
+                                            rodInventoryId = itemId
+                                            break
                                         end
                                     end
                                     
-                                    if not bestRodId then return end
+                                    if not rodInventoryId then return end
                                     
                                     if not playerData.isFishingRodEquipped then
                                         local currentEquippedIndex = nil
@@ -948,24 +950,9 @@ If any of these are enabled, the script won't work properly...]]})
                                             task.wait(1)
                                         end
                                         
-                                        InventoryService:useItem(bestRodId, {use=1})
+                                        -- Equip the rod
+                                        InventoryService:useItem(rodInventoryId, {use=1})
                                         task.wait(1)
-                                    else
-                                        local currentRod, currentRodIndex, currentRodId = nil, 0, nil
-                                        for itemId, itemData in pairs(playerData.inventory.exclusive) do
-                                            local itemObj = Util.itemUtils.createItemFromData(itemData)
-                                            if itemObj:getName():lower():find("fishingrod") then
-                                                currentRod = itemObj:getRealName()
-                                                currentRodIndex = itemObj:directory()[itemObj:getName()].index
-                                                currentRodId = itemId
-                                                break
-                                            end
-                                        end
-                                        
-                                        if not (currentRodIndex == bestRodIndex and currentRodId == bestRodId) then
-                                            InventoryService:useItem(bestRodId, {use=1})
-                                            task.wait(1)
-                                        end
                                     end
                                 end)
                                 
@@ -986,36 +973,38 @@ If any of these are enabled, the script won't work properly...]]})
 
                             elseif _G.CurrentResourceQuest == "ore" and oreQuest then
                                 table.insert(threads, task.spawn(function()
-                                    -- Equip best pickaxe (unchanged)
+                                    -- Equip pickaxe
                                     pcall(function()
-                                        local ExclusiveItems = require(ReplicatedStorage.Shared.List.Items.Exclusive)
                                         local playerData = DataController:getData()
-                                        local bestPickaxe, bestPickaxeIndex, bestInventoryIndex = nil, 0, nil
+                                        
+                                        local pickaxeInventoryIndex = nil
                                         for inventoryIndex, itemData in pairs(playerData.inventory.exclusive) do
                                             local itemObj = Util.itemUtils.createItemFromData(itemData)
                                             local itemName = itemObj:getName()
+                                            
+                                            -- Check if it's a pickaxe
                                             if itemName:lower():find("pickaxe") then
-                                                local pickaxeData = ExclusiveItems[itemName]
-                                                if pickaxeData and pickaxeData.index and pickaxeData.index > bestPickaxeIndex then
-                                                    bestPickaxeIndex = pickaxeData.index
-                                                    bestPickaxe = itemObj:getRealName()
-                                                    bestInventoryIndex = inventoryIndex
-                                                end
+                                                pickaxeInventoryIndex = inventoryIndex
+                                                break
                                             end
                                         end
-                                        if not bestInventoryIndex then return end
+                                        
+                                        if not pickaxeInventoryIndex then return end
+                                        
                                         if not playerData.isPickaxeEquipped then
                                             local currentEquippedIndex = nil
+                                            
                                             if playerData.isFishingRodEquipped then
                                                 for itemId, itemData in pairs(playerData.inventory.exclusive) do
                                                     local itemObj = Util.itemUtils.createItemFromData(itemData)
                                                     local itemName = itemObj:getName()
-                                                    if itemName:lower():find("fishingrod") then
+                                                    if itemName:lower():find("fishingrod") or itemName:lower():find("rod") then
                                                         currentEquippedIndex = itemId
                                                         break
                                                     end
                                                 end
                                             end
+                                            
                                             if playerData.isAxeEquipped and not currentEquippedIndex then
                                                 for itemId, itemData in pairs(playerData.inventory.exclusive) do
                                                     local itemObj = Util.itemUtils.createItemFromData(itemData)
@@ -1026,27 +1015,15 @@ If any of these are enabled, the script won't work properly...]]})
                                                     end
                                                 end
                                             end
+                                            
                                             if currentEquippedIndex then
                                                 InventoryService:useItem(currentEquippedIndex, {use=1})
                                                 task.wait(1)
                                             end
-                                            InventoryService:useItem(bestInventoryIndex, {use=1})
+                                            
+                                            -- Equip the pickaxe
+                                            InventoryService:useItem(pickaxeInventoryIndex, {use=1})
                                             task.wait(1)
-                                        else
-                                            local currentPickaxe, currentPickaxeIndex, currentPickaxeId = nil, 0, nil
-                                            for itemId, itemData in pairs(playerData.inventory.exclusive) do
-                                                local itemObj = Util.itemUtils.createItemFromData(itemData)
-                                                if itemObj:getName():lower():find("pickaxe") then
-                                                    currentPickaxe = itemObj:getRealName()
-                                                    currentPickaxeIndex = itemObj:directory()[itemObj:getName()].index
-                                                    currentPickaxeId = itemId
-                                                    break
-                                                end
-                                            end
-                                            if not (currentPickaxeIndex == bestPickaxeIndex and currentPickaxeId == bestInventoryIndex) then
-                                                InventoryService:useItem(bestInventoryIndex, {use=1})
-                                                task.wait(1)
-                                            end
                                         end
                                     end)
 
