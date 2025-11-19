@@ -541,6 +541,11 @@ local function BuildUI()
         end
     })
 
+CompleteQuestsSection:Paragraph("MainScriptWarning", {
+    Title = "Important!",
+    Content = [[
+Auto Fish, Auto Cut Trees, Auto Mining, and Auto Hatch must be turned OFF in the main script for this to work properly.
+If any of these are enabled, the script won't work properly...]]})
 
     -- Auto Complete Season Quests Toggle
     local seasonQuestEnabled = false
@@ -651,22 +656,26 @@ local function BuildUI()
                             local otherQuests = {}
 
                             for _, quest in ipairs(questsToProcess) do
-                                if quest.type == "openAnyEgg" or quest.type == "hatchEpicPet" or quest.type == "hatchLegendaryPet" then
-                                    eggQuest = quest
-                                elseif quest.type == "hatchMythicalPet" or quest.type == "hatchEternalPet" then
+                                if quest.type == "hatchMythicalPet" or quest.type == "hatchEternalPet" then
                                     mythicalEternalQuest = quest
+                                    eggQuest = nil -- Stop normal hatching if mythical/eternal quest is active
+                                elseif quest.type == "openAnyEgg" or quest.type == "hatchEpicPet" or quest.type == "hatchLegendaryPet" then
+                                    if not mythicalEternalQuest then
+                                        eggQuest = quest
+                                    end
                                 elseif quest.type == "destroyMeteor" then
                                     meteorQuest = quest
                                 elseif quest.type == "destroyTree" or quest.type == "destroyAnyTree" then
                                     treeQuest = quest
                                 elseif quest.type:find("catchFish") or quest.type == "catchAnyFish" or quest.type == "catchFishRarity" then
                                     fishQuest = quest
-                                elseif quest.type:find("destroyOre") or quest.type == "destroyAnyOre" then  -- ADD THIS
+                                elseif quest.type:find("destroyOre") or quest.type == "destroyAnyOre" then
                                     oreQuest = quest
                                 else
                                     table.insert(otherQuests, quest)
                                 end
                             end
+
                             local threads = {}
 
                             if eggQuest and _G.CurrentResourceQuest ~= "tree" then
