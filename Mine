@@ -162,7 +162,7 @@ BuildUI = function()
                                             LocalPlayer:RequestStreamAroundAsync(machine.teleport.p, 5)
                                             task.wait(0.5)
                                             character.HumanoidRootPart:PivotTo(machine.teleport)
-                                            task.wait(3)
+                                            task.wait(1)
                                             character.HumanoidRootPart:PivotTo(machine.teleport) 
                                             hasTeleported = true
                                             task.wait()
