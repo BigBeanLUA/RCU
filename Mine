@@ -157,17 +157,16 @@ BuildUI = function()
                                     end
                                     
                                     if canTeleport then
-                                        
                                         local character = LocalPlayer.Character
                                         if character and character:FindFirstChild("HumanoidRootPart") then
                                             LocalPlayer:RequestStreamAroundAsync(machine.teleport.p, 5)
                                             task.wait(0.5)
                                             character.HumanoidRootPart:PivotTo(machine.teleport)
+                                            task.wait(3)
+                                            character.HumanoidRootPart:PivotTo(machine.teleport) 
                                             hasTeleported = true
                                             task.wait()
-                                        else
                                         end
-                                    else
                                     end
                                     
                                     found = true
