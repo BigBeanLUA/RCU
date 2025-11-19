@@ -2031,12 +2031,17 @@ BuildUI = function()
     end)
 
         SaveManager:SetLibrary(Library)
-        Window:SelectTab(1)
         InterfaceManager:SetLibrary(Library)
         SaveManager:IgnoreThemeSettings()
         SaveManager:SetIgnoreIndexes{}
         InterfaceManager:SetFolder("FluentScriptHub")
-        SaveManager:SetFolder("FluentScriptHub/specific-game")
+        SaveManager:SetFolder("FluentScriptHub/RCU-mine") -- Set once for this script
+
+        InterfaceManager:BuildInterfaceSection(Tabs.Settings)
+        SaveManager:BuildConfigSection(Tabs.Settings)
+
+        Window:SelectTab(1)
+        SaveManager:LoadAutoloadConfig()
     end
 
 task.spawn(function()
@@ -2093,6 +2098,7 @@ task.spawn(function()
     }
 
     Tabs = {
+        Settings = Window:AddTab({ Title = "Settings", Icon = "settings" }),
         Mine = Window:AddTab({ Title = "Mine", Icon = "pickaxe" }),
         Building = Window:AddTab({ Title = "Building", Icon = "hammer" }),
     }
