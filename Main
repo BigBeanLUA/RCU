@@ -4229,12 +4229,14 @@ end)
             -- Filter zones based on selection
             local zonesToCollect = {}
             if next(selectedZones) then
+                -- If zones are selected, only collect from those
                 for _, zoneData in ipairs(unlockedZones) do
                     if selectedZones[zoneData.name] then
                         table.insert(zonesToCollect, zoneData)
                     end
                 end
             else
+                -- If no zones selected, collect from all unlocked zones
                 zonesToCollect = unlockedZones
             end
 
@@ -4286,8 +4288,6 @@ end)
 
                 task.wait(1)
             end
-
-            humanoidRootPart:PivotTo(originalCFrame)
         end
 
         pcall(beginChestCollection)
@@ -4332,7 +4332,7 @@ end)
     })
 
     -- Toggle for Auto Chest Collection
-    ClaimSection:Toggle("Auto Collect Mini-Chests", {
+    ClaimSection:Toggle("AutoCollectMiniChests", {
         Title = "Auto Collect Mini-Chests",
         Default = false,
         Callback = function(enabled)
