@@ -125,75 +125,92 @@ BuildUI = function()
     local autoSellEnabled = false
     local autoSellThread
 
+    local KnitClient = require(game:GetService("ReplicatedStorage").Packages.Knit.KnitClient)
+    local FishingService = KnitClient.GetService("FishingService")
+
     local AutoSell = AutoFishSection:Toggle("AutoSellFish", {
         Title = "Auto Sell Fish",
-        Description = "Automatically sells all fish EXCEPT the fish needed for rods upgrades.",
+        Description = "Automatically sells all fish EXCEPT the fish needed for rod upgrades.",
         Default = false,
+
         Callback = function(state)
+            -- Disable previous thread cleanly
             autoSellEnabled = state
-            
-            -- Stop previous loop if it exists
-            if autoSellThread and coroutine.status(autoSellThread) == "running" then
-                autoSellEnabled = false
+            if autoSellThread then
                 task.cancel(autoSellThread)
                 autoSellThread = nil
             end
-            
-            if state then
-                autoSellThread = task.spawn(function()
-                    while autoSellEnabled do
-                        local playerData = DataController:getData()
-                        local currentIndex = nil
-                        
-                        for _, itemData in pairs(playerData.inventory.exclusive) do
-                            local itemObj = Util.itemUtils.createItemFromData(itemData)
-                            if itemObj:getName():lower():find("fishingrod") then
-                                currentIndex = itemObj:directory()[itemObj:getName()].index
+
+            -- If turned OFF, stop here
+            if not state then return end
+
+            -- Start new loop
+            autoSellThread = task.spawn(function()
+                while autoSellEnabled do
+                    local playerData = DataController:getData()
+                    if not playerData or not playerData.inventory then
+                        task.wait(1)
+                        continue
+                    end
+
+
+                    local currentIndex = nil
+
+                    for _, itemData in pairs(playerData.inventory.exclusive or {}) do
+                        local itemObj = Util.itemUtils.createItemFromData(itemData)
+                        if itemObj and itemObj:getName():lower():find("fishingrod") then
+                            local dir = itemObj:directory()
+                            if dir and dir[itemObj:getName()] then
+                                currentIndex = dir[itemObj:getName()].index
+                            end
+                            break
+                        end
+                    end
+
+
+                    local neededFishNames = {}
+
+                    if currentIndex then
+                        for name, data in pairs(FishingRodList) do
+                            if name:lower():find("fishingrod") and data.index == currentIndex + 1 then
+                                local upgradeData = FishingRodUpgrader[name]
+                                if upgradeData and upgradeData.required then
+                                    for _, req in ipairs(upgradeData.required) do
+                                        local reqName = req.getName and req:getName() or req.name
+                                        if reqName then
+                                            table.insert(neededFishNames, reqName)
+                                        end
+                                    end
+                                end
                                 break
                             end
                         end
+                    end
 
-                        local neededFishNames = {}
-                        if currentIndex then
-                            for name, data in pairs(FishingRodList) do
-                                if name:lower():find("fishingrod") and data.index == currentIndex + 1 then
-                                    local req = FishingRodUpgrader[name]
-                                    if req and req.required then
-                                        for _, reqItem in ipairs(req.required) do
-                                            table.insert(neededFishNames, reqItem:getName())
-                                        end
-                                    end
-                                    break
-                                end
-                            end
-                        end
 
-                        task.wait(0.5)
-
-                        local playerData = DataController:getData()
-                        local sellTable = {}
-                        for itemId, itemData in pairs(playerData.inventory.fish or {}) do
-                            local itemObj = Util.itemUtils.createItemFromData(itemData)
+                    local sellTable = {}
+                    for itemId, itemData in pairs(playerData.inventory.fish or {}) do
+                        local itemObj = Util.itemUtils.createItemFromData(itemData)
+                        if itemObj then
                             local fishName = itemObj:getName()
-
                             if not table.find(neededFishNames, fishName) then
                                 sellTable[itemId] = true
                             end
                         end
-
-                        if next(sellTable) then
-                            pcall(function()
-                                local KnitClient = require(game:GetService("ReplicatedStorage").Packages.Knit.KnitClient)
-                                KnitClient.GetService("FishingService"):sellFish(sellTable)
-                            end)
-                        end
-
-                        task.wait(3)
                     end
-                end)
-            end
+
+                    if next(sellTable) then
+                        pcall(function()
+                            FishingService:sellFish(sellTable)
+                        end)
+                    end
+
+                    task.wait(3)
+                end
+            end)
         end
     })
+
 
     isAutoEquipRodEnabled = false
     AutoEquip = AutoFishSection:Toggle("AutoEquipBestRod", {
