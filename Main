@@ -527,15 +527,32 @@ BuildUI = function()
         end
     })
     
-
     local EggHatchingSection = Tabs.Eggs:AddSection("Auto Hatch")
+
     local EggsModule = require(ReplicatedStorage.Shared.List.Pets.Eggs)
     local EggUtils = require(ReplicatedStorage.Shared.Util.EggUtils)
+    local SuffixToNumber = require(ReplicatedStorage.Shared.Functions.SuffixToNumber)
 
-    formatNumber = function(num)
-        local suffixes={{1e18,"Qi"},{1e21,"Sx"},{1e24,"Sp"},{1e27,"Oc"},{1e30,"No"},{1e33,"Dc"},{1e36,"Ud"},{1e39,"Dd"},{1e42,"Td"},{1e45,"Qd"},{1e48,"Qid"},{1e51,"Sxd"},{1e54,"Spd"},{1e57,"Ocd"},{1e60,"Nd"},{1e63,"Vg"}}
-        for i=#suffixes,1,-1 do local t,s=suffixes[i][1],suffixes[i][2] if num>=t then local v=num/t return string.format("%.2f%s",v,s):gsub("%.00","")end end
-        if num>=1e15 then local v=num/1e15 return string.format("%.2fQa",v):gsub("%.00","")elseif num>=1e12 then local v=num/1e12 return string.format("%.2fT",v):gsub("%.00","")elseif num>=1e9 then local v=num/1e9 return string.format("%.2fB",v):gsub("%.00","")elseif num>=1e6 then local v=num/1e6 return string.format("%.2fM",v):gsub("%.00","")elseif num>=1e3 then local v=num/1e3 return string.format("%.2fK",v):gsub("%.00","")else return tostring(math.floor(num))end
+    -- Build a reverse lookup table for suffixes from SuffixToNumber
+    local suffixes = {}
+    for suffix, power in pairs(debug.getupvalue(SuffixToNumber, 1)) do
+        suffixes[power] = suffix
+    end
+
+    local function formatNumber(num)
+        if num < 1000 then return tostring(num) end
+        local bestPower = 0
+        for power, _ in pairs(suffixes) do
+            if num >= 10^(power * 3) and power > bestPower then
+                bestPower = power
+            end
+        end
+        if bestPower > 0 then
+            local value = num / (10 ^ (bestPower * 3))
+            local suffix = suffixes[bestPower]
+            return string.format("%.2f%s", value, suffix):gsub("%.00", "")
+        end
+        return tostring(num)
     end
 
     local eggsTable, displayToEggName = {}, {}
@@ -566,7 +583,6 @@ BuildUI = function()
         Searchable = true,
         Callback = function(Value)
             if Value == "Best Egg (Clicks)" then
-
                 local EggsModule = require(ReplicatedStorage.Shared.List.Pets.Eggs)
                 local MapsModule = require(ReplicatedStorage.Shared.List.Maps)
                 DataController:waitForData()
@@ -586,7 +602,6 @@ BuildUI = function()
                         break
                     end
                 end
-                -- Keep "Best Egg (Clicks)" selected, just return the best egg name
                 selectedEgg = bestEggName or selectedEgg
                 return selectedEgg
             else
@@ -636,18 +651,18 @@ BuildUI = function()
             if Value then
                 task.spawn(function()
                     while _G.AutoHatchEnabled do
-                        local args = {selectedEgg, selectedAmount or 1}
-
-                        if useLuckyEggs then
-                            local anyAvailableLuckyId, _ = next(EggController._luckyEggs or {})
-                            if anyAvailableLuckyId then
-                                table.insert(args, {luckyEggId = anyAvailableLuckyId})
+                        if not HatchingController._isHatching then
+                            print("isHatching is false, hatching now!")
+                            local args = {selectedEgg, selectedAmount or 1}
+                            if useLuckyEggs then
+                                local anyAvailableLuckyId, _ = next(EggController._luckyEggs or {})
+                                if anyAvailableLuckyId then
+                                    table.insert(args, {luckyEggId = anyAvailableLuckyId})
+                                end
                             end
+                            EggService.openEgg._re:FireServer(unpack(args))
                         end
-
-                        EggService.openEgg._re:FireServer(unpack(args))
-                        
-                        task.wait(_G.SmartHatchDelay)
+                        task.wait(0.05)
                     end
                 end)
             end
