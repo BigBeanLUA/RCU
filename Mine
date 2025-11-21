@@ -508,8 +508,21 @@ BuildUI = function()
                     AutoBreakThread = nil
                 end
             end
+        end})
+
+    task.spawn(function()
+        while true do
+            if AutoBreakEnabled then
+                AutoMine:SetValue(false)
+                task.wait(0.5)
+                AutoMine:SetValue(true)
+                task.wait(0.5)
+                AutoMine:SetValue(true)
+            end
+            task.wait(20)
         end
-    })
+    end)
+
 
     local ForceStrongEnoughEnabled = false
     local originalIsStrongEnough
@@ -1647,19 +1660,12 @@ BuildUI = function()
                                         AutoMine:SetValue(true)
                                     end
                                 end
-                                
-                                -- Calculate smart hatch delay
-                                local hatchDelay = 4.11
-                                local hatchTimeLabel = LocalPlayer.PlayerGui.MainUI.Menus.SettingsFrame.Main.List.Multipliers.HatchingSpeed.Main.Amount
-                                local success, labelText = pcall(function() return hatchTimeLabel.Text end)
-                                if success and labelText then
-                                    local numberString = string.match(labelText, "%d+%.?%d*")
-                                    if numberString then
-                                        hatchDelay = (tonumber(numberString) or 4.01) + 0.1
-                                    end
+
+                                while not HatchingController._isHatching do
+                                    EggService.openEgg._re:FireServer(questName, 99)
+                                    print(HatchignContrtoller._isHatching)
+                                    task.wait(0.05)
                                 end
-                                EggService.openEgg._re:FireServer(questName, 99)
-                                task.wait(hatchDelay)
                             end
                         end)
                         
