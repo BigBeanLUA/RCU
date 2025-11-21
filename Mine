@@ -1196,7 +1196,7 @@ BuildUI = function()
     end)
 
    
- local autoUpgradePickaxeEnabled = false
+    local autoUpgradePickaxeEnabled = false
     local autoUpgradePickaxeThread
     local previousOreSelection = {}
 
@@ -1297,7 +1297,6 @@ BuildUI = function()
                                     end
                                     
                                     if bestOre and bestOre.formattedName then
-                                        -- Update dropdown and selectedOres
                                         SelectOres:SetValue({[bestOre.formattedName] = true})
                                         selectedOres = {bestOre.formattedName}
                                     end  
@@ -1346,8 +1345,7 @@ BuildUI = function()
                         task.wait(3)
                     end
                 end)
-            else
-                -- Restore previous ore selection when toggle is disabled
+            elseif HasBeenTurnedOn == true then
                 if autoUpgradePickaxeThread then
                     task.cancel(autoUpgradePickaxeThread)
                     autoUpgradePickaxeThread = nil
@@ -1358,9 +1356,6 @@ BuildUI = function()
                 selectedOres = {}
                 for oreName, _ in pairs(previousOreSelection) do
                     table.insert(selectedOres, oreName)
-                end
-                
-                if #selectedOres > 0 then
                 end
             end
         end
@@ -1449,8 +1444,9 @@ BuildUI = function()
         Default = false,
         Callback = function(enabled)
             autoMinerQuestEnabled = enabled
-            
+
             if autoMinerQuestEnabled then
+                HasBeenTurnedOn = true
                 
                 -- Store previous settings
                 previousMinerQuestSettings = {
@@ -1487,7 +1483,7 @@ BuildUI = function()
                                 QuestService:claimMinerQuest()
                                 
                                 
-                                if previousMinerQuestSettings and previousMinerQuestSettings.selectedOres and next(previousMinerQuestSettings.selectedOres) then
+                                if HasBeenTurnedOn == true  and previousMinerQuestSettings and previousMinerQuestSettings.selectedOres and next(previousMinerQuestSettings.selectedOres) then
                                     SelectOres:SetValue(previousMinerQuestSettings.selectedOres)
                                     selectedOres = {}
                                     for oreName, _ in pairs(previousMinerQuestSettings.selectedOres) do
@@ -1495,7 +1491,7 @@ BuildUI = function()
                                     end
                                 end
                                 
-                                if previousMinerQuestSettings and AutoMine.Value ~= previousMinerQuestSettings.autoMineEnabled then
+                                if HasBeenTurnedOn == true and previousMinerQuestSettings and AutoMine.Value ~= previousMinerQuestSettings.autoMineEnabled then
                                     AutoMine:SetValue(previousMinerQuestSettings.autoMineEnabled)
                                 end
                                 
@@ -1545,13 +1541,11 @@ BuildUI = function()
                                 
                                 if next(dropdownSelection) then
                                     SelectOres:SetValue(dropdownSelection)
-                                else
                                 end
                                 
                                 -- Enable auto mine
                                 if not AutoBreakEnabled then
                                     AutoMine:SetValue(true)
-                                else
                                 end
                                 
                             elseif questType == "destroyAnyOre" then
@@ -1652,7 +1646,6 @@ BuildUI = function()
                                     if not AutoBreakEnabled then
                                         AutoMine:SetValue(true)
                                     end
-                                else
                                 end
                                 
                                 -- Calculate smart hatch delay
@@ -1667,7 +1660,6 @@ BuildUI = function()
                                 end
                                 EggService.openEgg._re:FireServer(questName, 99)
                                 task.wait(hatchDelay)
-                            else
                             end
                         end)
                         
@@ -1689,7 +1681,7 @@ BuildUI = function()
                     end
                 end
                 
-                if previousMinerQuestSettings and AutoMine.Value ~= previousMinerQuestSettings.autoMineEnabled then
+                if HasBeenTurnedOn == true and previousMinerQuestSettings and AutoMine.Value ~= previousMinerQuestSettings.autoMineEnabled then
                     AutoMine:SetValue(previousMinerQuestSettings.autoMineEnabled)
                 end
             end
@@ -1831,6 +1823,7 @@ BuildUI = function()
             isAutoBuildEnabled = enabled
             
             if enabled then
+                HasBeenTurnedOn1 = true
                 -- Store previous settings
                 previousAutoBuildSettings.selectedOres = {}
                 for _, oreName in ipairs(selectedOres) do
@@ -1988,7 +1981,7 @@ BuildUI = function()
                 end
                 
                 -- Restore previous settings
-                if previousAutoBuildSettings and previousAutoBuildSettings.selectedOres and next(previousAutoBuildSettings.selectedOres) then
+                if HasBeenTurnedOn1 == true and previousAutoBuildSettings and previousAutoBuildSettings.selectedOres and next(previousAutoBuildSettings.selectedOres) then
                     SelectOres:SetValue(previousAutoBuildSettings.selectedOres)
                     selectedOres = {}
                     for oreName, _ in pairs(previousAutoBuildSettings.selectedOres) do
@@ -1996,7 +1989,7 @@ BuildUI = function()
                     end
                 end
                 
-                if previousAutoBuildSettings and AutoMine.Value ~= previousAutoBuildSettings.autoMineEnabled then
+                if HasBeenTurnedOn1 == true and previousAutoBuildSettings and AutoMine.Value ~= previousAutoBuildSettings.autoMineEnabled then
                     AutoMine:SetValue(previousAutoBuildSettings.autoMineEnabled)
                 end
             end
