@@ -652,7 +652,6 @@ BuildUI = function()
                 task.spawn(function()
                     while _G.AutoHatchEnabled do
                         if not HatchingController._isHatching then
-                            print("isHatching is false, hatching now!")
                             local args = {selectedEgg, selectedAmount or 1}
                             if useLuckyEggs then
                                 local anyAvailableLuckyId, _ = next(EggController._luckyEggs or {})
