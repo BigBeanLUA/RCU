@@ -208,6 +208,29 @@ BuildUI = function()
         end
     })
 
+    Thanksgiving = Tabs.Thanksgiving:AddSection("Thanksgiving Event")
+
+    
+    Thanksgiving:Button({
+        Title = "Thanksgiving Script",
+        Description = "Sorry for the separate loadstring! Having such a large script was causing me to run out of local uses and creating lag issues.",
+        Callback = function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/BigBeanLUA/RCU/refs/heads/main/Thanksgiving"))()
+        end
+    })
+
+    Thanksgiving:Toggle("AutoLoadThanksgiving", {
+    Title = "Auto Load Thanksgiving Script",
+    Description = "Automatically loads the thanksgiving script when you load this script. Use this if you have auto load config on.",
+    Default = false,
+    Callback = function(enabled)
+        AutoLoadSeasonQuest4 = enabled
+        if enabled then
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/BigBeanLUA/RCU/refs/heads/main/Thanksgiving"))()
+        end
+    end})
+
+
     local ClickSection = Tabs.Main:AddSection("Auto Click")
 
     local ClickController = require(game:GetService("Players").LocalPlayer.PlayerScripts.Client.Controllers.ClickController)
@@ -654,12 +677,22 @@ BuildUI = function()
                         if not HatchingController._isHatching then
                             local args = {selectedEgg, selectedAmount or 1}
                             if useLuckyEggs then
-                                local anyAvailableLuckyId, _ = next(EggController._luckyEggs or {})
-                                if anyAvailableLuckyId then
-                                    table.insert(args, {luckyEggId = anyAvailableLuckyId})
+                                -- Find the luckiest available lucky egg
+                                local bestLuckyEggId = nil
+                                local highestMultiplier = 0
+                                for luckyEggId, _ in pairs(EggController._luckyEggs or {}) do
+                                    local multiplier = (EggController._globalLuckEventAmount or 0) * 1000
+                                    if multiplier > highestMultiplier then
+                                        highestMultiplier = multiplier
+                                        bestLuckyEggId = luckyEggId
+                                    end
+                                end
+                                if bestLuckyEggId then
+                                    table.insert(args, {luckyEggId = bestLuckyEggId})
                                 end
                             end
                             EggService.openEgg._re:FireServer(unpack(args))
+                            task.wait(0.2)
                         end
                         task.wait(0.05)
                     end
@@ -5535,7 +5568,6 @@ end)
             task.wait(30) 
         end
     end)
-
 end
 
 task.spawn(function()
@@ -5595,6 +5627,7 @@ task.spawn(function()
     Tabs = {
         Settings = Window:AddTab({ Title = "Settings", Icon = "settings" }),
         Rejoin = Window:AddTab({ Title = "Auto Rejoin", Icon = "recycle" }),
+        Thanksgiving = Window:AddTab({ Title = "Thanksgiving Event", Icon = "phosphor-acorn" }),
         Main = Window:AddTab({ Title = "Auto Farm", Icon = "crown" }),
         Eggs = Window:AddTab({ Title = "Eggs", Icon = "egg" }),
         Tree = Window:AddTab({ Title = "Axe/Tree", Icon = "phosphor-tree-evergreen-duotone" }),
