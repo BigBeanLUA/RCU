@@ -4746,7 +4746,23 @@ end)
         end
     })
 
+    AdminWheelSection = Tabs.Misc:AddSection("Admin Wheel")
 
+    isAutoAdminWheelSpinEnabled = false
+    AdminWheelSection:Toggle("AutoAdminWheelSpin", {
+        Title = "Auto Spin Admin Wheel",
+        Default = false,
+        Callback = function(enabled)
+            isAutoAdminWheelSpinEnabled = enabled
+            task.spawn(function()
+                while isAutoAdminWheelSpinEnabled do
+                    pcall(function() Knit.GetService("AdminAbuseService"):adminWheelSpin() end)
+                    task.wait(5)
+                end
+            end)
+        end
+    })
+    
     AncientMerchantSection = Tabs.Misc:AddSection("Ancient Merchant")
 
     getAllAncientMerchantItems = function()
