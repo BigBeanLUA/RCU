@@ -2189,7 +2189,7 @@ BuildUI = function()
 
     AutoCritDamageSection:Toggle("AutoCriticalTap", {
         Title = "Auto Critical Tap",
-        Description = "You will always deal 1000x damage. Incredibly overpowered.",
+        Description = "Game patched the old method (still works, but muchhhhh slower).",
         Default = false,
         Callback = function(Value)
             autoCriticalTapEnabled = Value
@@ -2198,7 +2198,6 @@ BuildUI = function()
                 task.spawn(function()
                     while autoCriticalTapEnabled do
                         if inDungeon then
-                            -- Check if a boss exists before firing
                             local dungeonBosses = CollectionService:GetTagged("dungeonBoss")
                             if #dungeonBosses > 0 then
                                 pcall(function()
