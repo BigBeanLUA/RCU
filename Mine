@@ -1663,7 +1663,7 @@ BuildUI = function()
 
                                 while not HatchingController._isHatching do
                                     EggService.openEgg._re:FireServer(questName, 99)
-                                    print(HatchignContrtoller._isHatching)
+                                    task.wait(0.2)
                                     task.wait(0.05)
                                 end
                             end
