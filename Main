@@ -1583,6 +1583,7 @@ BuildUI = function()
         Default = false,
         Callback = function(enabled)
             if enabled then
+                HasBeenEnabled1 = true
                 isAutoUpgradeEnabled = true
                 AutoEquip:SetValue(true)
 
@@ -1677,7 +1678,7 @@ BuildUI = function()
                         task.wait(5)
                     end
                 end)
-            else
+            elseif HasBeenEnabled1 == true then
                 isAutoUpgradeEnabled = false
                 
                 if treeToggleThread then
@@ -2994,6 +2995,7 @@ BuildUI = function()
         Callback = function(enabled)
             isAutoCraftEnabled = enabled
             if enabled then
+                HasBeenEnabled = true
                 originalAutoCraftSettings.selectedTrees = {}
                 for treeObject, isSelected in pairs(SelectTreesDropdown.Value) do
                     originalAutoCraftSettings.selectedTrees[treeObject] = isSelected
@@ -3038,7 +3040,7 @@ BuildUI = function()
                                     end
                                 end
                             end
-                            if #neededWoods > 0 then
+                            if #neededWoods > 0 and HasBeenEnabled == true then
                                 local neededTreeObjects = {}
                                 for _, woodName in ipairs(neededWoods) do
                                     local treeWorld = mapWoodToTreeWorldForCraft(woodName)
@@ -3048,14 +3050,14 @@ BuildUI = function()
                                 end
                                 SelectTreesDropdown:SetValue(neededTreeObjects)
                                 if not autoBreakRunning then AutoCutTreesToggle:SetValue(true) end
-                            elseif canCraftSomething and autoBreakRunning then
+                            elseif HasBeenEnabled == true and canCraftSomething and autoBreakRunning then
                                 AutoCutTreesToggle:SetValue(false)
                             end
                         end)
                         task.wait(3)
                     end
                 end)
-            elseif next(originalAutoCraftSettings) then
+            elseif HasBeenEnabled == true and next(originalAutoCraftSettings) then
                 SelectTreesDropdown:SetValue(originalAutoCraftSettings.selectedTrees)
                 if autoBreakRunning ~= originalAutoCraftSettings.autoCutState then
                     AutoCutTreesToggle:SetValue(originalAutoCraftSettings.autoCutState)
