@@ -4946,39 +4946,8 @@ end)
     })
 
     
-    local AutoHatch = EggHatchingSection:Toggle("AutoHatch", {
-        Title = "Auto Hatch Eggs", Default = false,
-        Callback = function(Value)
-            _G.AutoHatchEnabled = Value
-            if Value then
-                task.spawn(function()
-                    while _G.AutoHatchEnabled do
-                        if not HatchingController._isHatching then
-                            local args = {selectedEgg, selectedAmount or 1}
-                            if useLuckyEggs then
-                                -- Find the luckiest available lucky egg
-                                local bestLuckyEggId = nil
-                                local highestMultiplier = 0
-                                for luckyEggId, _ in pairs(EggController._luckyEggs or {}) do
-                                    local multiplier = (EggController._globalLuckEventAmount or 0) * 1000
-                                    if multiplier > highestMultiplier then
-                                        highestMultiplier = multiplier
-                                        bestLuckyEggId = luckyEggId
-                                    end
-                                end
-                                if bestLuckyEggId then
-                                    table.insert(args, {luckyEggId = bestLuckyEggId})
-                                end
-                            end
-                            EggService.openEgg._re:FireServer(unpack(args))
-                            task.wait(0.2)
-                        end
-                        task.wait(0.05)
-                    end
-                end)
-            end
-        end
-    })
+
+    
     local UseItemsSection = Tabs.Misc:AddSection("Use Items")
 
     local autoUseThreads = {}
