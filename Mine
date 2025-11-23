@@ -131,9 +131,7 @@ BuildUI = function()
     local AutoBreakThread
     local AutoBreakMonitorThread
     local AutoBreakEnabled = false
-    local hasTeleported = false
     local lastSuccessfulBreak = tick()
-    local lastTeleportCheck = tick()
 
     local AutoMine = AutoMineSection:Toggle("AutoBreakSelected", {
         Title = "Auto Break (Selected)",
@@ -142,8 +140,27 @@ BuildUI = function()
         Callback = function(state)
             AutoBreakEnabled = state
             
+            -- Always cancel existing threads first
+            if AutoBreakThread then
+                task.cancel(AutoBreakThread)
+                AutoBreakThread = nil
+            end
+            if AutoBreakMonitorThread then
+                task.cancel(AutoBreakMonitorThread)
+                AutoBreakMonitorThread = nil
+            end
+            
+            task.wait(0.2)
+            
             if AutoBreakEnabled then
-                if not hasTeleported then
+                lastSuccessfulBreak = tick()
+                
+                -- Check if we're in Space Mine
+                local roomFolder = workspace.Game.Maps.Void["Space Mine"].Rooms:FindFirstChild("[1] Room")
+                local inSpaceMine = roomFolder and roomFolder:FindFirstChild("OreRoomSpawn")
+                
+                -- Only teleport to Space Mine if not already there
+                if not inSpaceMine then
                     local Maps = require(ReplicatedStorage.Shared.List.Maps)
                     local targetMachine = "Space Mine"
                     local found = false
@@ -166,10 +183,9 @@ BuildUI = function()
                                             task.wait(0.5)
                                             character.HumanoidRootPart:PivotTo(machine.teleport)
                                             task.wait(1)
-                                            character.HumanoidRootPart:PivotTo(machine.teleport) 
-                                            hasTeleported = true
+                                            character.HumanoidRootPart:PivotTo(machine.teleport)
                                             lastSuccessfulBreak = tick()
-                                            task.wait()
+                                            task.wait(3) -- Wait 3 seconds after teleporting to Space Mine
                                         end
                                     end
                                     
@@ -185,8 +201,8 @@ BuildUI = function()
                 
                 -- Monitor thread that checks every 3 seconds
                 AutoBreakMonitorThread = task.spawn(function()
-                    local KnitClient = require(game:GetService("ReplicatedStorage").Packages.Knit.KnitClient)
-                    local OreService = KnitClient.GetService("OreService")
+                    local Knit = require(game:GetService("ReplicatedStorage").Packages.Knit.KnitClient)
+                    local OreService = Knit.GetService("OreService")
                     local Players = game:GetService("Players")
                     local Ores = require(game:GetService("ReplicatedStorage").Shared.List.Mine.Ores)
                     local OreRooms = require(game:GetService("ReplicatedStorage").Shared.List.Mine.OreRooms)
@@ -275,6 +291,10 @@ BuildUI = function()
                     while AutoBreakEnabled do
                         task.wait(3)
                         
+                        if not AutoBreakEnabled then
+                            break
+                        end
+                        
                         local timeSinceLastBreak = tick() - lastSuccessfulBreak
                         
                         if timeSinceLastBreak > 5 then
@@ -299,14 +319,12 @@ BuildUI = function()
                                     local room, score, beatablePercent, isFallback = findBestRoomForOres(selectedOreIds, pickaxeDamage)
                                     
                                     if room then
-                                        
                                         local roomNumber = room:match("%d+")
                                         local formattedRoomName = "[" .. roomNumber .. "] Room"
                                         
                                         local roomFolder = workspace.Game.Maps.Void["Space Mine"].Rooms:FindFirstChild(formattedRoomName)
                                         
                                         if roomFolder then
-                                            -- Check if any ores exist in this room
                                             local hasOres = false
                                             local data = DataController:getData()
                                             if data and data.ores and data.ores[room] then
@@ -318,20 +336,16 @@ BuildUI = function()
                                             
                                             if hasOres then
                                                 local modelsFolder = roomFolder:FindFirstChild("Models")
-                                                
                                                 if modelsFolder then
                                                     local children = modelsFolder:GetChildren()
-                                                    
                                                     local firstModel = children[1]
                                                     if firstModel then
-                                                        local modelCFrame = firstModel:GetPivot()
-                                                        hrp:PivotTo(modelCFrame)
+                                                        hrp:PivotTo(firstModel:GetPivot())
                                                         lastSuccessfulBreak = tick()
                                                     end
                                                 end
                                             else
                                                 local oreRoomSpawn = roomFolder:FindFirstChild("OreRoomSpawn")
-                                                
                                                 if oreRoomSpawn then
                                                     hrp:PivotTo(oreRoomSpawn.CFrame)
                                                     lastSuccessfulBreak = tick()
@@ -347,8 +361,8 @@ BuildUI = function()
 
                 -- Main breaking thread
                 AutoBreakThread = task.spawn(function()
-                    local KnitClient = require(game:GetService("ReplicatedStorage").Packages.Knit.KnitClient)
-                    local OreService = KnitClient.GetService("OreService")
+                    local Knit = require(game:GetService("ReplicatedStorage").Packages.Knit.KnitClient)
+                    local OreService = Knit.GetService("OreService")
                     local DataController = require(game:GetService("ReplicatedStorage").Packages.Knit).GetController("DataController")
                     local Ores = require(game:GetService("ReplicatedStorage").Shared.List.Mine.Ores)
                     local AfkOres = require(game:GetService("ReplicatedStorage").Shared.List.Mine.AfkOres)
@@ -459,19 +473,20 @@ BuildUI = function()
                         end
                     end
                     
-                    -- Teleport to the best room
+                    -- Teleport to the best room immediately
                     if bestRoomToTeleport then
                         local character = Players.LocalPlayer.Character
                         local hrp = character and character:FindFirstChild("HumanoidRootPart")
                         if hrp then
-                            local roomFolder = workspace.Game.Maps.Void["Space Mine"].Rooms:FindFirstChild(bestRoomToTeleport)
+                            local roomNumber = bestRoomToTeleport:match("%d+")
+                            local formattedRoomName = "[" .. roomNumber .. "] Room"
+                            local roomFolder = workspace.Game.Maps.Void["Space Mine"].Rooms:FindFirstChild(formattedRoomName)
                             if roomFolder then
                                 local modelsFolder = roomFolder:FindFirstChild("Models")
                                 if modelsFolder then
                                     local firstModel = modelsFolder:GetChildren()[1]
-                                    if firstModel and firstModel:IsA("Model") then
-                                        local modelCFrame = firstModel:GetPivot()
-                                        hrp:PivotTo(modelCFrame)
+                                    if firstModel then
+                                        hrp:PivotTo(firstModel:GetPivot())
                                         task.wait(0.5)
                                     end
                                 end
@@ -483,7 +498,16 @@ BuildUI = function()
                     local lastRoomCheck = tick()
 
                     while AutoBreakEnabled do
+                        if not AutoBreakEnabled then
+                            break
+                        end
+                        
                         local data = DataController:getData()
+                        if not data then
+                            task.wait(1)
+                            continue
+                        end
+                        
                         local selectedNames = GetSelectedOres and GetSelectedOres() or {}
                         
                         local selectedOreIds = {}
@@ -504,14 +528,15 @@ BuildUI = function()
                                 local character = Players.LocalPlayer.Character
                                 local hrp = character and character:FindFirstChild("HumanoidRootPart")
                                 if hrp then
-                                    local roomFolder = workspace.Game.Maps.Void["Space Mine"].Rooms:FindFirstChild(room)
+                                    local roomNumber = room:match("%d+")
+                                    local formattedRoomName = "[" .. roomNumber .. "] Room"
+                                    local roomFolder = workspace.Game.Maps.Void["Space Mine"].Rooms:FindFirstChild(formattedRoomName)
                                     if roomFolder then
                                         local modelsFolder = roomFolder:FindFirstChild("Models")
                                         if modelsFolder then
                                             local firstModel = modelsFolder:GetChildren()[1]
-                                            if firstModel and firstModel:IsA("Model") then
-                                                local modelCFrame = firstModel:GetPivot()
-                                                hrp:PivotTo(modelCFrame)
+                                            if firstModel then
+                                                hrp:PivotTo(firstModel:GetPivot())
                                                 task.wait(0.5)
                                             end
                                         end
@@ -530,7 +555,7 @@ BuildUI = function()
                             local roomId = ore:GetAttribute("roomId")
                             local id = ore:GetAttribute("id")
                             
-                            if roomId and id and data.ores[roomId] and data.ores[roomId][id] then
+                            if roomId and id and data.ores and data.ores[roomId] and data.ores[roomId][id] then
                                 local info = data.ores[roomId][id]
                                 local formattedName = rawToFormatted[info.oreId]
                                 
@@ -607,7 +632,7 @@ BuildUI = function()
                                 local roomId = ore:GetAttribute("roomId")
                                 local id = ore:GetAttribute("id")
                                 
-                                if roomId == currentTargetRoom and id and data.ores[roomId] and data.ores[roomId][id] then
+                                if roomId == currentTargetRoom and id and data.ores and data.ores[roomId] and data.ores[roomId][id] then
                                     local info = data.ores[roomId][id]
                                     local oreData = Ores[info.oreId]
                                     if oreData then
@@ -636,43 +661,42 @@ BuildUI = function()
 
                             if bestOre.type == "Ore" then
                                 local oreInstance = bestOre.ore
-                                local orePart = oreInstance.PrimaryPart or oreInstance:FindFirstChildWhichIsA("BasePart")
-                                if hrp and orePart then
-                                    hrp.CFrame = orePart.CFrame + Vector3.new(0, 3, 0)
-                                end
+                                if oreInstance and oreInstance.Parent then
+                                    local orePart = oreInstance.PrimaryPart or oreInstance:FindFirstChildWhichIsA("BasePart")
+                                    if hrp and orePart then
+                                        hrp.CFrame = orePart.CFrame + Vector3.new(0, 3, 0)
+                                    end
 
-                                OreService.damage._re:FireServer(bestOre.roomId, bestOre.id)
-                                lastSuccessfulBreak = tick()
+                                    pcall(function()
+                                        OreService.damage._re:FireServer(bestOre.roomId, bestOre.id)
+                                    end)
+                                    
+                                    lastSuccessfulBreak = tick()
+                                end
 
                             elseif bestOre.type == "AfkOre" then
                                 local oreInstance = bestOre.ore
-                                local orePart = oreInstance.PrimaryPart or oreInstance:FindFirstChildWhichIsA("BasePart")
-                                if hrp and orePart then
-                                    hrp.CFrame = orePart.CFrame + Vector3.new(0, 3, 0)
-                                end
+                                if oreInstance and oreInstance.Parent then
+                                    local orePart = oreInstance.PrimaryPart or oreInstance:FindFirstChildWhichIsA("BasePart")
+                                    if hrp and orePart then
+                                        hrp.CFrame = orePart.CFrame + Vector3.new(0, 3, 0)
+                                    end
 
-                                OreService.damageAfk._re:FireServer(bestOre.oreId)
-                                lastSuccessfulBreak = tick()
+                                    pcall(function()
+                                        OreService.damageAfk._re:FireServer(bestOre.oreId)
+                                    end)
+                                    
+                                    lastSuccessfulBreak = tick()
+                                end
                             end
                         end
 
                         task.wait(0.5)
                     end
                 end)
-            else
-                hasTeleported = false
-                if AutoBreakThread then
-                    task.cancel(AutoBreakThread)
-                    AutoBreakThread = nil
-                end
-                if AutoBreakMonitorThread then
-                    task.cancel(AutoBreakMonitorThread)
-                    AutoBreakMonitorThread = nil
-                end
             end
         end
     })
-
 
     task.spawn(function()
         while true do
