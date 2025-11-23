@@ -482,6 +482,148 @@ BuildUI = function()
         end
     })
 
+    local BoxesSection = Tabs.Turkey:AddSection("Thanksgiving Items")
+
+    local ThanksgivingEvent = require(game:GetService("ReplicatedStorage").Shared.List.Items.ThanksgivingEvent)
+    local boxNames = {}
+    local boxNameToId = {}
+    local idToBoxName = {}
+    local selectedBoxes = {}
+
+    for key, value in pairs(ThanksgivingEvent) do
+        if value.itemType == "box" and value.name then
+            table.insert(boxNames, value.name)
+            boxNameToId[value.name] = key
+            idToBoxName[key] = value.name
+        end
+    end
+
+    for key, value in pairs(ThanksgivingEvent) do
+        if key == "turkeyEgg" and value.name then
+            table.insert(boxNames, value.name)
+            boxNameToId[value.name] = key
+            idToBoxName[key] = value.name
+        end
+    end
+
+    local BoxDropdown = BoxesSection:Dropdown("SelectBox", {
+        Title = "Select Items",
+        Values = boxNames,
+        Default = {},
+        Multi = true,
+        Searchable = true,
+        Callback = function(selected)
+            selectedBoxes = {}
+            for displayName, isSelected in pairs(selected) do
+                if isSelected then
+                    local id = boxNameToId[displayName]
+                    if id then
+                        selectedBoxes[id] = true 
+                    end
+                end
+            end
+        end
+    })
+
+    BoxesSection:Button({
+        Title = "Select All Items",
+        Callback = function()
+            local allSelected = {}
+            for _, name in ipairs(boxNames) do
+                local id = boxNameToId[name]
+                if id then
+                    allSelected[id] = true
+                end
+            end
+            -- Set dropdown values using display names
+            local allDisplayNames = {}
+            for _, name in ipairs(boxNames) do
+                allDisplayNames[name] = true
+            end
+            BoxDropdown:SetValue(allDisplayNames)
+            selectedBoxes = allSelected
+            for id, _ in pairs(selectedBoxes) do
+            end
+        end
+    })
+
+    BoxesSection:Toggle("AutoUseSelectedBoxes", {
+        Title = "Auto Use (All)",
+        Default = false,
+        Callback = function(Value)
+            AutoUseBox = Value
+            AutoUseSelectedBoxesEnabled = Value
+
+            -- Stop previous thread if it exists
+            if AutoUseSelectedBoxesThread and coroutine.status(AutoUseSelectedBoxesThread) == "running" then
+                AutoUseSelectedBoxesEnabled = false
+                task.cancel(AutoUseSelectedBoxesThread)
+                AutoUseSelectedBoxesThread = nil
+                task.wait(0.1)
+            end
+
+            if Value then
+                local Knit = require(game:GetService("ReplicatedStorage").Packages.Knit.KnitClient)
+                local InventoryService = Knit.GetService("InventoryService")
+
+                AutoUseSelectedBoxesEnabled = true
+                AutoUseSelectedBoxesThread = task.spawn(function()
+                    while AutoUseSelectedBoxesEnabled do
+                        print("[DEBUG] Starting new check cycle")
+                        DataController:waitForData()
+                        local playerData = DataController:getData()
+                        
+                        if playerData and playerData.inventory and playerData.inventory.thanksgivingEvent then
+                            print("[DEBUG] Player data found")
+                            local inventory = playerData.inventory.thanksgivingEvent
+                            local toOpen = {}
+                            local hasBoxes = false
+                            
+                            for boxId, isSelected in pairs(selectedBoxes) do
+                                if isSelected then
+                                    print("[DEBUG] Checking selected box:", boxId)
+                                    for itemId, itemData in pairs(inventory) do
+                                        if itemData.nm == boxId or itemId == boxId then
+                                            local owned = itemData.am or 1  -- Default to 1 if am isn't found
+                                            print("[DEBUG] Found box:", boxId, "ItemID:", itemId, "Amount:", owned)
+                                            if owned > 0 then
+                                                table.insert(toOpen, {id = itemId, amount = owned})
+                                                hasBoxes = true
+                                            end
+                                            break
+                                        end
+                                    end
+                                end
+                            end
+                            
+                            print("[DEBUG] Boxes to open:", #toOpen, "Has boxes:", hasBoxes)
+                            
+                            -- Open each selected box, one at a time, with 0.5s delay between
+                            for i, boxData in ipairs(toOpen) do
+                                print("[DEBUG] Opening box", i, "of", #toOpen, "ID:", boxData.id, "Amount:", boxData.amount)
+                                pcall(function()
+                                    InventoryService:useItem(boxData.id, {use = boxData.amount})
+                                end)
+                                task.wait(0.5)
+                            end
+                            
+                            -- If no boxes were found, wait 3 seconds before checking again
+                            if not hasBoxes then
+                                print("[DEBUG] No boxes found, waiting 3 seconds")
+                                task.wait(3)
+                            else
+                                print("[DEBUG] Boxes were opened, checking again immediately")
+                            end
+                        else
+                            print("[DEBUG] No player data found, waiting 3 seconds")
+                            task.wait(3)
+                        end
+                    end
+                    print("[DEBUG] Loop ended - AutoUseSelectedBoxesEnabled:", AutoUseSelectedBoxesEnabled)
+                end)
+            end
+        end
+    })
 
     SaveManager:SetLibrary(Library)
     InterfaceManager:SetLibrary(Library)
