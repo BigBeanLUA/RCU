@@ -316,7 +316,6 @@ BuildUI = function()
                                                 end
                                             end
                                             
-                                            
                                             if hasOres then
                                                 local modelsFolder = roomFolder:FindFirstChild("Models")
                                                 
