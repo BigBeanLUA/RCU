@@ -333,7 +333,7 @@ BuildUI = function()
     local isAutoTurkeyTeleportEnabled = false
     local autoTurkeyTeleportThread
 
-    ExtraSection:Toggle("AutoTurkeyTeleport", {
+    local Teleport = ExtraSection:Toggle("AutoTurkeyTeleport", {
         Title = "Auto Teleport to Turkey Event",
         Default = false,
         Callback = function(Value)
@@ -358,6 +358,20 @@ BuildUI = function()
             end
         end
     })
+
+    
+    task.spawn(function()
+        while true do
+            if Teleport.Value then
+                Teleport:SetValue(false)
+                task.wait(0.2)
+                Teleport:SetValue(true)
+                task.wait(0.2)
+                Teleport:SetValue(true)
+            end
+            task.wait(5)
+        end
+    end)
 
     local isAutoSpinWheelEnabled = false
     local autoSpinWheelThread
