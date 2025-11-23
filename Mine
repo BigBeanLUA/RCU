@@ -128,338 +128,321 @@ BuildUI = function()
         return selectedOres
     end
 
-  local AutoBreakThread
-local AutoBreakMonitorThread
-local AutoBreakEnabled = false
-local hasTeleported = false
-local lastSuccessfulBreak = tick()
-local lastTeleportCheck = tick()
+    local AutoBreakThread
+    local AutoBreakMonitorThread
+    local AutoBreakEnabled = false
+    local hasTeleported = false
+    local lastSuccessfulBreak = tick()
+    local lastTeleportCheck = tick()
 
-local AutoMine = AutoMineSection:Toggle("AutoBreakSelected", {
-    Title = "Auto Break (Selected)",
-    Description = "Break selected ores.",
-    Default = false,
-    Callback = function(state)
-        AutoBreakEnabled = state
-        
-        if AutoBreakEnabled then
-            if not hasTeleported then
-                local Maps = require(ReplicatedStorage.Shared.List.Maps)
-                local targetMachine = "Space Mine"
-                local found = false
+    local AutoMine = AutoMineSection:Toggle("AutoBreakSelected", {
+        Title = "Auto Break (Selected)",
+        Description = "Break selected ores.",
+        Default = false,
+        Callback = function(state)
+            AutoBreakEnabled = state
+            
+            if AutoBreakEnabled then
+                if not hasTeleported then
+                    local Maps = require(ReplicatedStorage.Shared.List.Maps)
+                    local targetMachine = "Space Mine"
+                    local found = false
 
-                for mapId, mapData in pairs(Maps) do
-                    if mapData.machines then
-                        for _, machine in pairs(mapData.machines) do
-                            if machine.name == targetMachine and machine.teleport then
-                                
-                                local canTeleport = true
-                                if machine.canTeleport then
-                                    local playerData = DataController:getData()
-                                    canTeleport = machine.canTeleport(playerData)
+                    for mapId, mapData in pairs(Maps) do
+                        if mapData.machines then
+                            for _, machine in pairs(mapData.machines) do
+                                if machine.name == targetMachine and machine.teleport then
+                                    
+                                    local canTeleport = true
+                                    if machine.canTeleport then
+                                        local playerData = DataController:getData()
+                                        canTeleport = machine.canTeleport(playerData)
+                                    end
+                                    
+                                    if canTeleport then
+                                        local character = LocalPlayer.Character
+                                        if character and character:FindFirstChild("HumanoidRootPart") then
+                                            LocalPlayer:RequestStreamAroundAsync(machine.teleport.p, 5)
+                                            task.wait(0.5)
+                                            character.HumanoidRootPart:PivotTo(machine.teleport)
+                                            task.wait(1)
+                                            character.HumanoidRootPart:PivotTo(machine.teleport) 
+                                            hasTeleported = true
+                                            lastSuccessfulBreak = tick()
+                                            task.wait()
+                                        end
+                                    end
+                                    
+                                    found = true
+                                    break
                                 end
+                            end
+                            
+                            if found then break end
+                        end
+                    end
+                end
+                
+                -- Monitor thread that checks every 3 seconds
+                AutoBreakMonitorThread = task.spawn(function()
+                    local KnitClient = require(game:GetService("ReplicatedStorage").Packages.Knit.KnitClient)
+                    local OreService = KnitClient.GetService("OreService")
+                    local Players = game:GetService("Players")
+                    local Ores = require(game:GetService("ReplicatedStorage").Shared.List.Mine.Ores)
+                    local OreRooms = require(game:GetService("ReplicatedStorage").Shared.List.Mine.OreRooms)
+                    local ExclusiveItems = require(game:GetService("ReplicatedStorage").Shared.List.Items.Exclusive)
+                    
+                    local function getPickaxeDamage()
+                        local data = DataController:getData()
+                        if data and data.inventory and data.inventory.exclusive then
+                            for _, itemData in pairs(data.inventory.exclusive) do
+                                local itemObj = Util.itemUtils.createItemFromData(itemData)
+                                local itemName = itemObj:getName()
                                 
-                                if canTeleport then
-                                    local character = LocalPlayer.Character
-                                    if character and character:FindFirstChild("HumanoidRootPart") then
-                                        LocalPlayer:RequestStreamAroundAsync(machine.teleport.p, 5)
-                                        task.wait(0.5)
-                                        character.HumanoidRootPart:PivotTo(machine.teleport)
-                                        task.wait(1)
-                                        character.HumanoidRootPart:PivotTo(machine.teleport) 
-                                        hasTeleported = true
-                                        lastSuccessfulBreak = tick()
-                                        task.wait()
+                                if itemName:lower():find("pickaxe") then
+                                    local pickaxeData = ExclusiveItems[itemName]
+                                    if pickaxeData and pickaxeData.multiplier then
+                                        local baseDamage = pickaxeData.multiplier
+                                        local playerMultiplier = data.pickaxeDamageMultiplier or 0
+                                        local totalDamage = baseDamage + playerMultiplier
+                                        return totalDamage
+                                    end
+                                end
+                            end
+                        end
+                        return 10
+                    end
+                    
+                    local function findBestRoomForOres(selectedOreIds, pickaxeDamage)
+                        local bestRoom = nil
+                        local bestScore = 0
+                        local bestBeatablePercent = 0
+                        local fallbackRoom = nil
+                        local fallbackScore = 0
+                        
+                        for roomName, roomData in pairs(OreRooms) do
+                            if roomData.ores then
+                                local totalSelectedChance = 0
+                                for _, oreId in ipairs(selectedOreIds) do
+                                    if roomData.ores[oreId] then
+                                        totalSelectedChance = totalSelectedChance + roomData.ores[oreId]
                                     end
                                 end
                                 
-                                found = true
-                                break
+                                if totalSelectedChance > 0 then
+                                    local totalChance = 0
+                                    local beatableChance = 0
+                                    
+                                    for roomOreId, chance in pairs(roomData.ores) do
+                                        totalChance = totalChance + chance
+                                        
+                                        local roomOreData = Ores[roomOreId]
+                                        if roomOreData and roomOreData.hp then
+                                            local hitsNeeded = math.ceil(roomOreData.hp / pickaxeDamage)
+                                            if hitsNeeded <= 75 then
+                                                beatableChance = beatableChance + chance
+                                            end
+                                        end
+                                    end
+                                    
+                                    local beatablePercent = (beatableChance / totalChance) * 100
+                                    
+                                    if totalSelectedChance > fallbackScore then
+                                        fallbackScore = totalSelectedChance
+                                        fallbackRoom = roomName
+                                    end
+                                    
+                                    if beatablePercent > 25 then
+                                        if totalSelectedChance > bestScore then
+                                            bestScore = totalSelectedChance
+                                            bestRoom = roomName
+                                            bestBeatablePercent = beatablePercent
+                                        end
+                                    end
+                                end
                             end
                         end
                         
-                        if found then break end
-                    end
-                end
-            end
-            
-            -- Monitor thread that checks every 3 seconds
-            AutoBreakMonitorThread = task.spawn(function()
-                local KnitClient = require(game:GetService("ReplicatedStorage").Packages.Knit.KnitClient)
-                local OreService = KnitClient.GetService("OreService")
-                local Players = game:GetService("Players")
-                local Ores = require(game:GetService("ReplicatedStorage").Shared.List.Mine.Ores)
-                local OreRooms = require(game:GetService("ReplicatedStorage").Shared.List.Mine.OreRooms)
-                local ExclusiveItems = require(game:GetService("ReplicatedStorage").Shared.List.Items.Exclusive)
-                
-                local function getPickaxeDamage()
-                    local data = DataController:getData()
-                    if data and data.inventory and data.inventory.exclusive then
-                        for _, itemData in pairs(data.inventory.exclusive) do
-                            local itemObj = Util.itemUtils.createItemFromData(itemData)
-                            local itemName = itemObj:getName()
-                            
-                            if itemName:lower():find("pickaxe") then
-                                local pickaxeData = ExclusiveItems[itemName]
-                                if pickaxeData and pickaxeData.multiplier then
-                                    local baseDamage = pickaxeData.multiplier
-                                    local playerMultiplier = data.pickaxeDamageMultiplier or 0
-                                    local totalDamage = baseDamage + playerMultiplier
-                                    return totalDamage
-                                end
-                            end
+                        if bestRoom then
+                            return bestRoom, bestScore, bestBeatablePercent, false
+                        elseif fallbackRoom then
+                            return fallbackRoom, fallbackScore, 0, true
                         end
+                        
+                        return nil, 0, 0, false
                     end
-                    return 10
-                end
-                
-                local function findBestRoomForOres(selectedOreIds, pickaxeDamage)
-                    local bestRoom = nil
-                    local bestScore = 0
-                    local bestBeatablePercent = 0
-                    local fallbackRoom = nil
-                    local fallbackScore = 0
                     
-                    for roomName, roomData in pairs(OreRooms) do
-                        if roomData.ores then
-                            -- Calculate total spawn chance for selected ores in this room
-                            local totalSelectedChance = 0
-                            for _, oreId in ipairs(selectedOreIds) do
-                                if roomData.ores[oreId] then
-                                    totalSelectedChance = totalSelectedChance + roomData.ores[oreId]
-                                end
-                            end
+                    while AutoBreakEnabled do
+                        task.wait(3)
+                        
+                        local timeSinceLastBreak = tick() - lastSuccessfulBreak
+                        
+                        if timeSinceLastBreak > 5 then
+                            local character = Players.LocalPlayer.Character
+                            local hrp = character and character:FindFirstChild("HumanoidRootPart")
                             
-                            if totalSelectedChance > 0 then
-                                -- Calculate percentage of beatable ores in this room
-                                local totalChance = 0
-                                local beatableChance = 0
+                            if hrp then
+                                local selectedNames = GetSelectedOres and GetSelectedOres() or {}
+                                local selectedOreIds = {}
                                 
-                                for roomOreId, chance in pairs(roomData.ores) do
-                                    totalChance = totalChance + chance
-                                    
-                                    local roomOreData = Ores[roomOreId]
-                                    if roomOreData and roomOreData.hp then
-                                        local hitsNeeded = math.ceil(roomOreData.hp / pickaxeDamage)
-                                        if hitsNeeded <= 75 then
-                                            beatableChance = beatableChance + chance
+                                for _, formattedName in ipairs(selectedNames) do
+                                    if not formattedName:find("%[AFK%]") then
+                                        local oreId = formattedToRaw[formattedName]
+                                        if oreId then
+                                            table.insert(selectedOreIds, oreId)
                                         end
                                     end
                                 end
                                 
-                                local beatablePercent = (beatableChance / totalChance) * 100
-                                
-                                -- Track fallback (highest selected ore chance regardless of beatable %)
-                                if totalSelectedChance > fallbackScore then
-                                    fallbackScore = totalSelectedChance
-                                    fallbackRoom = roomName
-                                end
-                                
-                                -- Only consider this room if beatable % is > 25%
-                                if beatablePercent > 25 then
-                                    if totalSelectedChance > bestScore then
-                                        bestScore = totalSelectedChance
-                                        bestRoom = roomName
-                                        bestBeatablePercent = beatablePercent
-                                    end
-                                end
-                            end
-                        end
-                    end
-                    
-                    -- Return best room if found, otherwise fallback
-                    if bestRoom then
-                        return bestRoom, bestScore, bestBeatablePercent, false
-                    elseif fallbackRoom then
-                        return fallbackRoom, fallbackScore, 0, true
-                    end
-                    
-                    return nil, 0, 0, false
-                end
-                
-                while AutoBreakEnabled do
-                    task.wait(3)
-                    
-                    local timeSinceLastBreak = tick() - lastSuccessfulBreak
-                    
-                    -- If we haven't broken anything in 5 seconds, something is wrong
-                    if timeSinceLastBreak > 5 then
-                        
-                        local character = Players.LocalPlayer.Character
-                        local hrp = character and character:FindFirstChild("HumanoidRootPart")
-                        
-                        if hrp then
-                            local selectedNames = GetSelectedOres and GetSelectedOres() or {}
-                            local selectedOreIds = {}
-                            
-                            for _, formattedName in ipairs(selectedNames) do
-                                if not formattedName:find("%[AFK%]") then
-                                    local oreId = formattedToRaw[formattedName]
-                                    if oreId then
-                                        table.insert(selectedOreIds, oreId)
-                                    end
-                                end
-                            end
-                            
-                            if #selectedOreIds > 0 then
-                                local pickaxeDamage = getPickaxeDamage()
-                                local room, score, beatablePercent, isFallback = findBestRoomForOres(selectedOreIds, pickaxeDamage)
-                                
-                                if room then
-                                    local roomFolder = workspace.Game.Maps.Void["Space Mine"].Rooms:FindFirstChild(room)
-                                    if roomFolder and roomFolder:FindFirstChild("OreRoomSpawn") then
-                                        hrp:PivotTo(roomFolder.OreRoomSpawn.CFrame)
-                                        lastSuccessfulBreak = tick()
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
-            end)
-            
-            -- Main breaking thread
-            AutoBreakThread = task.spawn(function()
-                local KnitClient = require(game:GetService("ReplicatedStorage").Packages.Knit.KnitClient)
-                local OreService = KnitClient.GetService("OreService")
-                local DataController = require(game:GetService("ReplicatedStorage").Packages.Knit).GetController("DataController")
-                local Ores = require(game:GetService("ReplicatedStorage").Shared.List.Mine.Ores)
-                local AfkOres = require(game:GetService("ReplicatedStorage").Shared.List.Mine.AfkOres)
-                local OreRooms = require(game:GetService("ReplicatedStorage").Shared.List.Mine.OreRooms)
-                local ExclusiveItems = require(game:GetService("ReplicatedStorage").Shared.List.Items.Exclusive)
-                local CollectionService = game:GetService("CollectionService")
-                local Players = game:GetService("Players")
-
-                local function getPickaxeDamage()
-                    local data = DataController:getData()
-                    if data and data.inventory and data.inventory.exclusive then
-                        for _, itemData in pairs(data.inventory.exclusive) do
-                            local itemObj = Util.itemUtils.createItemFromData(itemData)
-                            local itemName = itemObj:getName()
-                            
-                            if itemName:lower():find("pickaxe") then
-                                local pickaxeData = ExclusiveItems[itemName]
-                                if pickaxeData and pickaxeData.multiplier then
-                                    local baseDamage = pickaxeData.multiplier
-                                    local playerMultiplier = data.pickaxeDamageMultiplier or 0
-                                    local totalDamage = baseDamage + playerMultiplier
-                                    return totalDamage, pickaxeData.name or itemName
-                                end
-                            end
-                        end
-                    end
-                    return 10, "Wooden Pickaxe"
-                end
-
-                local function findBestRoomForOres(selectedOreIds, pickaxeDamage)
-                    local bestRoom = nil
-                    local bestScore = 0
-                    local bestBeatablePercent = 0
-                    local fallbackRoom = nil
-                    local fallbackScore = 0
-                    
-                    for roomName, roomData in pairs(OreRooms) do
-                        if roomData.ores then
-                            -- Calculate total spawn chance for selected ores in this room
-                            local totalSelectedChance = 0
-                            for _, oreId in ipairs(selectedOreIds) do
-                                if roomData.ores[oreId] then
-                                    totalSelectedChance = totalSelectedChance + roomData.ores[oreId]
-                                end
-                            end
-                            
-                            if totalSelectedChance > 0 then
-                                -- Calculate percentage of beatable ores in this room
-                                local totalChance = 0
-                                local beatableChance = 0
-                                
-                                for roomOreId, chance in pairs(roomData.ores) do
-                                    totalChance = totalChance + chance
+                                if #selectedOreIds > 0 then
+                                    local pickaxeDamage = getPickaxeDamage()
+                                    local room, score, beatablePercent, isFallback = findBestRoomForOres(selectedOreIds, pickaxeDamage)
                                     
-                                    local roomOreData = Ores[roomOreId]
-                                    if roomOreData and roomOreData.hp then
-                                        local hitsNeeded = math.ceil(roomOreData.hp / pickaxeDamage)
-                                        if hitsNeeded <= 75 then
-                                            beatableChance = beatableChance + chance
+                                    if room then
+                                        
+                                        local roomNumber = room:match("%d+")
+                                        local formattedRoomName = "[" .. roomNumber .. "] Room"
+                                        
+                                        local roomFolder = workspace.Game.Maps.Void["Space Mine"].Rooms:FindFirstChild(formattedRoomName)
+                                        
+                                        if roomFolder then
+                                            -- Check if any ores exist in this room
+                                            local hasOres = false
+                                            local data = DataController:getData()
+                                            if data and data.ores and data.ores[room] then
+                                                for _, _ in pairs(data.ores[room]) do
+                                                    hasOres = true
+                                                    break
+                                                end
+                                            end
+                                            
+                                            
+                                            if hasOres then
+                                                local modelsFolder = roomFolder:FindFirstChild("Models")
+                                                
+                                                if modelsFolder then
+                                                    local children = modelsFolder:GetChildren()
+                                                    
+                                                    local firstModel = children[1]
+                                                    if firstModel then
+                                                        local modelCFrame = firstModel:GetPivot()
+                                                        hrp:PivotTo(modelCFrame)
+                                                        lastSuccessfulBreak = tick()
+                                                    end
+                                                end
+                                            else
+                                                local oreRoomSpawn = roomFolder:FindFirstChild("OreRoomSpawn")
+                                                
+                                                if oreRoomSpawn then
+                                                    hrp:PivotTo(oreRoomSpawn.CFrame)
+                                                    lastSuccessfulBreak = tick()
+                                                end
+                                            end
                                         end
                                     end
                                 end
+                            end
+                        end
+                    end
+                end)
+
+                -- Main breaking thread
+                AutoBreakThread = task.spawn(function()
+                    local KnitClient = require(game:GetService("ReplicatedStorage").Packages.Knit.KnitClient)
+                    local OreService = KnitClient.GetService("OreService")
+                    local DataController = require(game:GetService("ReplicatedStorage").Packages.Knit).GetController("DataController")
+                    local Ores = require(game:GetService("ReplicatedStorage").Shared.List.Mine.Ores)
+                    local AfkOres = require(game:GetService("ReplicatedStorage").Shared.List.Mine.AfkOres)
+                    local OreRooms = require(game:GetService("ReplicatedStorage").Shared.List.Mine.OreRooms)
+                    local ExclusiveItems = require(game:GetService("ReplicatedStorage").Shared.List.Items.Exclusive)
+                    local CollectionService = game:GetService("CollectionService")
+                    local Players = game:GetService("Players")
+
+                    local function getPickaxeDamage()
+                        local data = DataController:getData()
+                        if data and data.inventory and data.inventory.exclusive then
+                            for _, itemData in pairs(data.inventory.exclusive) do
+                                local itemObj = Util.itemUtils.createItemFromData(itemData)
+                                local itemName = itemObj:getName()
                                 
-                                local beatablePercent = (beatableChance / totalChance) * 100
-                                
-                                -- Track fallback (highest selected ore chance regardless of beatable %)
-                                if totalSelectedChance > fallbackScore then
-                                    fallbackScore = totalSelectedChance
-                                    fallbackRoom = roomName
-                                end
-                                
-                                -- Only consider this room if beatable % is > 25%
-                                if beatablePercent > 25 then
-                                    if totalSelectedChance > bestScore then
-                                        bestScore = totalSelectedChance
-                                        bestRoom = roomName
-                                        bestBeatablePercent = beatablePercent
+                                if itemName:lower():find("pickaxe") then
+                                    local pickaxeData = ExclusiveItems[itemName]
+                                    if pickaxeData and pickaxeData.multiplier then
+                                        local baseDamage = pickaxeData.multiplier
+                                        local playerMultiplier = data.pickaxeDamageMultiplier or 0
+                                        local totalDamage = baseDamage + playerMultiplier
+                                        return totalDamage, pickaxeData.name or itemName
                                     end
                                 end
                             end
                         end
+                        return 10, "Wooden Pickaxe"
                     end
-                    
-                    -- Return best room if found, otherwise fallback
-                    if bestRoom then
-                        return bestRoom, bestScore, bestBeatablePercent, false
-                    elseif fallbackRoom then
-                        return fallbackRoom, fallbackScore, 0, true
-                    end
-                    
-                    return nil, 0, 0, false
-                end
 
-                local pickaxeDamage, pickaxeName = getPickaxeDamage()
-
-                -- Find and teleport to best room immediately
-                local selectedNames = GetSelectedOres and GetSelectedOres() or {}
-                local selectedOreIds = {}
-                
-                for _, formattedName in ipairs(selectedNames) do
-                    if not formattedName:find("%[AFK%]") then
-                        local oreId = formattedToRaw[formattedName]
-                        if oreId then
-                            table.insert(selectedOreIds, oreId)
+                    local function findBestRoomForOres(selectedOreIds, pickaxeDamage)
+                        local bestRoom = nil
+                        local bestScore = 0
+                        local bestBeatablePercent = 0
+                        local fallbackRoom = nil
+                        local fallbackScore = 0
+                        
+                        for roomName, roomData in pairs(OreRooms) do
+                            if roomData.ores then
+                                local totalSelectedChance = 0
+                                for _, oreId in ipairs(selectedOreIds) do
+                                    if roomData.ores[oreId] then
+                                        totalSelectedChance = totalSelectedChance + roomData.ores[oreId]
+                                    end
+                                end
+                                
+                                if totalSelectedChance > 0 then
+                                    local totalChance = 0
+                                    local beatableChance = 0
+                                    
+                                    for roomOreId, chance in pairs(roomData.ores) do
+                                        totalChance = totalChance + chance
+                                        
+                                        local roomOreData = Ores[roomOreId]
+                                        if roomOreData and roomOreData.hp then
+                                            local hitsNeeded = math.ceil(roomOreData.hp / pickaxeDamage)
+                                            if hitsNeeded <= 75 then
+                                                beatableChance = beatableChance + chance
+                                            end
+                                        end
+                                    end
+                                    
+                                    local beatablePercent = (beatableChance / totalChance) * 100
+                                    
+                                    if totalSelectedChance > fallbackScore then
+                                        fallbackScore = totalSelectedChance
+                                        fallbackRoom = roomName
+                                    end
+                                    
+                                    if beatablePercent > 25 then
+                                        if totalSelectedChance > bestScore then
+                                            bestScore = totalSelectedChance
+                                            bestRoom = roomName
+                                            bestBeatablePercent = beatablePercent
+                                        end
+                                    end
+                                end
+                            end
                         end
-                    end
-                end
-                
-                local bestRoomToTeleport = nil
-                if #selectedOreIds > 0 then
-                    local room, score, beatablePercent, isFallback = findBestRoomForOres(selectedOreIds, pickaxeDamage)
-                    if room then
-                        bestRoomToTeleport = room
-                    end
-                end
-                
-                -- Teleport to the best room
-                if bestRoomToTeleport then
-                    local character = Players.LocalPlayer.Character
-                    local hrp = character and character:FindFirstChild("HumanoidRootPart")
-                    if hrp then
-                        local roomFolder = workspace.Game.Maps.Void["Space Mine"].Rooms:FindFirstChild(bestRoomToTeleport)
-                        if roomFolder and roomFolder:FindFirstChild("OreRoomSpawn") then
-                            hrp:PivotTo(roomFolder.OreRoomSpawn.CFrame)
-                            task.wait(0.5)
+                        
+                        if bestRoom then
+                            return bestRoom, bestScore, bestBeatablePercent, false
+                        elseif fallbackRoom then
+                            return fallbackRoom, fallbackScore, 0, true
                         end
+                        
+                        return nil, 0, 0, false
                     end
-                end
 
-                local currentTargetRoom = bestRoomToTeleport
-                local lastRoomCheck = tick()
+                    local pickaxeDamage, pickaxeName = getPickaxeDamage()
 
-                while AutoBreakEnabled do
-                    local data = DataController:getData()
                     local selectedNames = GetSelectedOres and GetSelectedOres() or {}
-                    
-                    -- Rebuild selected ore IDs
                     local selectedOreIds = {}
+                    
                     for _, formattedName in ipairs(selectedNames) do
                         if not formattedName:find("%[AFK%]") then
                             local oreId = formattedToRaw[formattedName]
@@ -469,81 +452,88 @@ local AutoMine = AutoMineSection:Toggle("AutoBreakSelected", {
                         end
                     end
                     
-                    -- Check if we should switch rooms (every 10 seconds)
-                    if tick() - lastRoomCheck > 10 and #selectedOreIds > 0 then
+                    local bestRoomToTeleport = nil
+                    if #selectedOreIds > 0 then
                         local room, score, beatablePercent, isFallback = findBestRoomForOres(selectedOreIds, pickaxeDamage)
-                        
                         if room then
-                            
-                            if room ~= currentTargetRoom then
-                                currentTargetRoom = room
-                                local character = Players.LocalPlayer.Character
-                                local hrp = character and character:FindFirstChild("HumanoidRootPart")
-                                if hrp then
-                                    local roomFolder = workspace.Game.Maps.Void["Space Mine"].Rooms:FindFirstChild(room)
-                                    if roomFolder and roomFolder:FindFirstChild("OreRoomSpawn") then
-                                        hrp:PivotTo(roomFolder.OreRoomSpawn.CFrame)
+                            bestRoomToTeleport = room
+                        end
+                    end
+                    
+                    -- Teleport to the best room
+                    if bestRoomToTeleport then
+                        local character = Players.LocalPlayer.Character
+                        local hrp = character and character:FindFirstChild("HumanoidRootPart")
+                        if hrp then
+                            local roomFolder = workspace.Game.Maps.Void["Space Mine"].Rooms:FindFirstChild(bestRoomToTeleport)
+                            if roomFolder then
+                                local modelsFolder = roomFolder:FindFirstChild("Models")
+                                if modelsFolder then
+                                    local firstModel = modelsFolder:GetChildren()[1]
+                                    if firstModel and firstModel:IsA("Model") then
+                                        local modelCFrame = firstModel:GetPivot()
+                                        hrp:PivotTo(modelCFrame)
                                         task.wait(0.5)
                                     end
                                 end
                             end
                         end
-                        
-                        lastRoomCheck = tick()
                     end
 
-                    -- Find best ore to break
-                    local bestOre = nil
-                    local lowestHP = math.huge
-                    local foundSelectedOre = false
+                    local currentTargetRoom = bestRoomToTeleport
+                    local lastRoomCheck = tick()
 
-                    -- First pass: Look for selected ores only
-                    for _, ore in CollectionService:GetTagged("Ore") do
-                        local roomId = ore:GetAttribute("roomId")
-                        local id = ore:GetAttribute("id")
+                    while AutoBreakEnabled do
+                        local data = DataController:getData()
+                        local selectedNames = GetSelectedOres and GetSelectedOres() or {}
                         
-                        if roomId and id and data.ores[roomId] and data.ores[roomId][id] then
-                            local info = data.ores[roomId][id]
-                            local formattedName = rawToFormatted[info.oreId]
-                            
-                            -- Check if this ore type is selected
-                            local isSelected = false
-                            for _, selectedName in ipairs(selectedNames) do
-                                if selectedName == formattedName then
-                                    isSelected = true
-                                    break
-                                end
-                            end
-                            
-                            if isSelected then
-                                local oreData = Ores[info.oreId]
-                                if oreData then
-                                    local remaining = oreData.hp - (info.damage or 0)
-                                    local hitsNeeded = math.ceil(remaining / pickaxeDamage)
-                                    
-                                    if remaining > 0 and hitsNeeded <= 75 and remaining < lowestHP then
-                                        lowestHP = remaining
-                                        bestOre = {
-                                            ore = ore,
-                                            type = "Ore",
-                                            roomId = roomId,
-                                            id = id,
-                                            oreId = info.oreId,
-                                            hp = remaining
-                                        }
-                                        foundSelectedOre = true
-                                    end
+                        local selectedOreIds = {}
+                        for _, formattedName in ipairs(selectedNames) do
+                            if not formattedName:find("%[AFK%]") then
+                                local oreId = formattedToRaw[formattedName]
+                                if oreId then
+                                    table.insert(selectedOreIds, oreId)
                                 end
                             end
                         end
-                    end
+                        
+                        if tick() - lastRoomCheck > 10 and #selectedOreIds > 0 then
+                            local room, score, beatablePercent, isFallback = findBestRoomForOres(selectedOreIds, pickaxeDamage)
+                            
+                            if room and room ~= currentTargetRoom then
+                                currentTargetRoom = room
+                                local character = Players.LocalPlayer.Character
+                                local hrp = character and character:FindFirstChild("HumanoidRootPart")
+                                if hrp then
+                                    local roomFolder = workspace.Game.Maps.Void["Space Mine"].Rooms:FindFirstChild(room)
+                                    if roomFolder then
+                                        local modelsFolder = roomFolder:FindFirstChild("Models")
+                                        if modelsFolder then
+                                            local firstModel = modelsFolder:GetChildren()[1]
+                                            if firstModel and firstModel:IsA("Model") then
+                                                local modelCFrame = firstModel:GetPivot()
+                                                hrp:PivotTo(modelCFrame)
+                                                task.wait(0.5)
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                            
+                            lastRoomCheck = tick()
+                        end
 
-                    -- Check AFK ores if no regular selected ore found
-                    if not foundSelectedOre then
-                        for _, ore in CollectionService:GetTagged("AfkOre") do
-                            local oreId = ore:GetAttribute("ore")
-                            if oreId and AfkOres[oreId] then
-                                local formattedName = "[AFK] " .. formatName(oreId)
+                        local bestOre = nil
+                        local lowestHP = math.huge
+                        local foundSelectedOre = false
+
+                        for _, ore in CollectionService:GetTagged("Ore") do
+                            local roomId = ore:GetAttribute("roomId")
+                            local id = ore:GetAttribute("id")
+                            
+                            if roomId and id and data.ores[roomId] and data.ores[roomId][id] then
+                                local info = data.ores[roomId][id]
+                                local formattedName = rawToFormatted[info.oreId]
                                 
                                 local isSelected = false
                                 for _, selectedName in ipairs(selectedNames) do
@@ -554,104 +544,136 @@ local AutoMine = AutoMineSection:Toggle("AutoBreakSelected", {
                                 end
                                 
                                 if isSelected then
-                                    local info = data.afkOres and data.afkOres[oreId]
-                                    local oreData = AfkOres[oreId]
-                                    local remaining = oreData.hp - ((info and info.damage) or 0)
-                                    local hitsNeeded = math.ceil(remaining / pickaxeDamage)
-                                    
-                                    if remaining > 0 and hitsNeeded <= 75 and remaining < lowestHP then
-                                        lowestHP = remaining
-                                        bestOre = {
-                                            ore = ore,
-                                            type = "AfkOre",
-                                            oreId = oreId,
-                                            hp = remaining
-                                        }
-                                        foundSelectedOre = true
+                                    local oreData = Ores[info.oreId]
+                                    if oreData then
+                                        local remaining = oreData.hp - (info.damage or 0)
+                                        local hitsNeeded = math.ceil(remaining / pickaxeDamage)
+                                        
+                                        if remaining > 0 and hitsNeeded <= 75 and remaining < lowestHP then
+                                            lowestHP = remaining
+                                            bestOre = {
+                                                ore = ore,
+                                                type = "Ore",
+                                                roomId = roomId,
+                                                id = id,
+                                                oreId = info.oreId,
+                                                hp = remaining
+                                            }
+                                            foundSelectedOre = true
+                                        end
                                     end
                                 end
                             end
                         end
-                    end
 
-                    -- If no selected ore found, break weakest ore in current room
-                    if not foundSelectedOre and currentTargetRoom then
-                        lowestHP = math.huge
-                        
-                        for _, ore in CollectionService:GetTagged("Ore") do
-                            local roomId = ore:GetAttribute("roomId")
-                            local id = ore:GetAttribute("id")
-                            
-                            if roomId == currentTargetRoom and id and data.ores[roomId] and data.ores[roomId][id] then
-                                local info = data.ores[roomId][id]
-                                local oreData = Ores[info.oreId]
-                                if oreData then
-                                    local remaining = oreData.hp - (info.damage or 0)
-                                    local hitsNeeded = math.ceil(remaining / pickaxeDamage)
+                        if not foundSelectedOre then
+                            for _, ore in CollectionService:GetTagged("AfkOre") do
+                                local oreId = ore:GetAttribute("ore")
+                                if oreId and AfkOres[oreId] then
+                                    local formattedName = "[AFK] " .. formatName(oreId)
                                     
-                                    if remaining > 0 and hitsNeeded <= 75 and remaining < lowestHP then
-                                        lowestHP = remaining
-                                        bestOre = {
-                                            ore = ore,
-                                            type = "Ore",
-                                            roomId = roomId,
-                                            id = id,
-                                            oreId = info.oreId,
-                                            hp = remaining
-                                        }
+                                    local isSelected = false
+                                    for _, selectedName in ipairs(selectedNames) do
+                                        if selectedName == formattedName then
+                                            isSelected = true
+                                            break
+                                        end
+                                    end
+                                    
+                                    if isSelected then
+                                        local info = data.afkOres and data.afkOres[oreId]
+                                        local oreData = AfkOres[oreId]
+                                        local remaining = oreData.hp - ((info and info.damage) or 0)
+                                        local hitsNeeded = math.ceil(remaining / pickaxeDamage)
+                                        
+                                        if remaining > 0 and hitsNeeded <= 75 and remaining < lowestHP then
+                                            lowestHP = remaining
+                                            bestOre = {
+                                                ore = ore,
+                                                type = "AfkOre",
+                                                oreId = oreId,
+                                                hp = remaining
+                                            }
+                                            foundSelectedOre = true
+                                        end
                                     end
                                 end
                             end
                         end
-                    end
 
-                    -- Break the best ore
-                    if bestOre then
-                        local character = Players.LocalPlayer.Character
-                        local hrp = character and character:FindFirstChild("HumanoidRootPart")
-
-                        if bestOre.type == "Ore" then
-                            local oreInstance = bestOre.ore
-                            local orePart = oreInstance.PrimaryPart or oreInstance:FindFirstChildWhichIsA("BasePart")
-                            if hrp and orePart then
-                                hrp.CFrame = orePart.CFrame + Vector3.new(0, 3, 0)
-                            end
-
-                            OreService.damage._re:FireServer(bestOre.roomId, bestOre.id)
-                            lastSuccessfulBreak = tick()
+                        if not foundSelectedOre and currentTargetRoom then
+                            lowestHP = math.huge
                             
-                            local oreTypeName = rawToFormatted[bestOre.oreId] or bestOre.oreId
-                            if foundSelectedOre then
+                            for _, ore in CollectionService:GetTagged("Ore") do
+                                local roomId = ore:GetAttribute("roomId")
+                                local id = ore:GetAttribute("id")
+                                
+                                if roomId == currentTargetRoom and id and data.ores[roomId] and data.ores[roomId][id] then
+                                    local info = data.ores[roomId][id]
+                                    local oreData = Ores[info.oreId]
+                                    if oreData then
+                                        local remaining = oreData.hp - (info.damage or 0)
+                                        local hitsNeeded = math.ceil(remaining / pickaxeDamage)
+                                        
+                                        if remaining > 0 and hitsNeeded <= 75 and remaining < lowestHP then
+                                            lowestHP = remaining
+                                            bestOre = {
+                                                ore = ore,
+                                                type = "Ore",
+                                                roomId = roomId,
+                                                id = id,
+                                                oreId = info.oreId,
+                                                hp = remaining
+                                            }
+                                        end
+                                    end
+                                end
                             end
-
-                        elseif bestOre.type == "AfkOre" then
-                            local oreInstance = bestOre.ore
-                            local orePart = oreInstance.PrimaryPart or oreInstance:FindFirstChildWhichIsA("BasePart")
-                            if hrp and orePart then
-                                hrp.CFrame = orePart.CFrame + Vector3.new(0, 3, 0)
-                            end
-
-                            OreService.damageAfk._re:FireServer(bestOre.oreId)
-                            lastSuccessfulBreak = tick()
                         end
-                    end
 
-                    task.wait(0.5)
+                        if bestOre then
+                            local character = Players.LocalPlayer.Character
+                            local hrp = character and character:FindFirstChild("HumanoidRootPart")
+
+                            if bestOre.type == "Ore" then
+                                local oreInstance = bestOre.ore
+                                local orePart = oreInstance.PrimaryPart or oreInstance:FindFirstChildWhichIsA("BasePart")
+                                if hrp and orePart then
+                                    hrp.CFrame = orePart.CFrame + Vector3.new(0, 3, 0)
+                                end
+
+                                OreService.damage._re:FireServer(bestOre.roomId, bestOre.id)
+                                lastSuccessfulBreak = tick()
+
+                            elseif bestOre.type == "AfkOre" then
+                                local oreInstance = bestOre.ore
+                                local orePart = oreInstance.PrimaryPart or oreInstance:FindFirstChildWhichIsA("BasePart")
+                                if hrp and orePart then
+                                    hrp.CFrame = orePart.CFrame + Vector3.new(0, 3, 0)
+                                end
+
+                                OreService.damageAfk._re:FireServer(bestOre.oreId)
+                                lastSuccessfulBreak = tick()
+                            end
+                        end
+
+                        task.wait(0.5)
+                    end
+                end)
+            else
+                hasTeleported = false
+                if AutoBreakThread then
+                    task.cancel(AutoBreakThread)
+                    AutoBreakThread = nil
                 end
-            end)
-        else
-            hasTeleported = false
-            if AutoBreakThread then
-                task.cancel(AutoBreakThread)
-                AutoBreakThread = nil
-            end
-            if AutoBreakMonitorThread then
-                task.cancel(AutoBreakMonitorThread)
-                AutoBreakMonitorThread = nil
+                if AutoBreakMonitorThread then
+                    task.cancel(AutoBreakMonitorThread)
+                    AutoBreakMonitorThread = nil
+                end
             end
         end
-    end
-})
+    })
+
 
     task.spawn(function()
         while true do
