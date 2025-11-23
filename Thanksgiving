@@ -333,31 +333,37 @@ BuildUI = function()
     local isAutoTurkeyTeleportEnabled = false
     local autoTurkeyTeleportThread
 
-    local Teleport = ExtraSection:Toggle("AutoTurkeyTeleport", {
-        Title = "Auto Teleport to Turkey Event",
-        Default = false,
-        Callback = function(Value)
-            isAutoTurkeyTeleportEnabled = Value
-            if autoTurkeyTeleportThread then
-                task.cancel(autoTurkeyTeleportThread)
-                autoTurkeyTeleportThread = nil
+    task.spawn(function()
+        local Teleport = ExtraSection:Toggle("AutoTurkeyTeleport", {
+            Title = "Auto Teleport to Turkey Event",
+            Default = false,
+            Callback = function(Value)
+                isAutoTurkeyTeleportEnabled = Value
+                if autoTurkeyTeleportThread then
+                    task.cancel(autoTurkeyTeleportThread)
+                    autoTurkeyTeleportThread = nil
+                end
+                if Value then
+                    autoTurkeyTeleportThread = task.spawn(function()
+                        pcall(function()
+                            local MapController = require(game:GetService("Players").LocalPlayer.PlayerScripts.Client.Controllers:FindFirstChild("MapController"))
+                            local TeleportFrame = require(game:GetService("StarterPlayer").StarterPlayerScripts.Client.Components.UI.Frames:FindFirstChild("TeleportFrame"))
+                            local TurkeyCFrame = require(game:GetService("ReplicatedStorage").Shared.List.Maps)[0].cframe
+                            while isAutoTurkeyTeleportEnabled do
+                                pcall(function()
+                                    local currentZoneId = MapController:getCurrentMap(true)
+                                    if currentZoneId ~= 0 then
+                                        TeleportFrame:teleportToPosition(0, TurkeyCFrame)
+                                    end
+                                end)
+                                task.wait(5)
+                            end
+                        end)
+                    end)
+                end
             end
-            if Value then
-                autoTurkeyTeleportThread = task.spawn(function()
-                    local MapController = require(game:GetService("Players").LocalPlayer.PlayerScripts.Client.Controllers:FindFirstChild("MapController"))
-                    local TeleportFrame = require(game:GetService("StarterPlayer").StarterPlayerScripts.Client.Components.UI.Frames:FindFirstChild("TeleportFrame"))
-                    local TurkeyCFrame = require(game:GetService("ReplicatedStorage").Shared.List.Maps)[0].cframe
-                    while isAutoTurkeyTeleportEnabled do
-                        local currentZoneId = MapController:getCurrentMap(true)
-                        if currentZoneId ~= 0 then
-                            TeleportFrame:teleportToPosition(0, TurkeyCFrame)
-                        end
-                        task.wait(5)
-                    end
-                end)
-            end
-        end
-    })
+        })
+end)
 
     
     task.spawn(function()
