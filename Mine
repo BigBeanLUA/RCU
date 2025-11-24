@@ -853,9 +853,7 @@ BuildUI = function()
             end
         end
     })
-
-        
-   local UndergroundMarketList = require(ReplicatedStorage.Shared.List.Mine.UndergroundMarket)
+local UndergroundMarketList = require(ReplicatedStorage.Shared.List.Mine.UndergroundMarket)
 
    local MarketSection = Tabs.Mine:AddSection("Underground Market")
 
@@ -897,6 +895,8 @@ BuildUI = function()
         Default = {},
         Callback = function(value)
             selectedMarketItems = value
+            for itemDisplay, _ in pairs(selectedMarketItems) do
+            end
         end
     })
 
@@ -938,28 +938,61 @@ BuildUI = function()
 
     MarketSection:Toggle("AutoBuyUndergroundMarket", {
         Title = "Auto Buy Underground Market",
-        Description = "Automatically buys all affordable and in-stock Underground Market items.",
+        Description = "Automatically buys selected affordable and in-stock Underground Market items.",
         Default = false,
         Callback = function(state)
             autoBuyEnabled = state
+            
             if autoBuyEnabled then
+
                 autoBuyThread = task.spawn(function()
                     local KnitClient = require(game:GetService("ReplicatedStorage").Packages.Knit.KnitClient)
                     local RewardService = KnitClient.GetService("RewardService")
+                    local cycleCount = 0
+                    
                     while autoBuyEnabled do
+                        cycleCount = cycleCount + 1
+                        
                         local playerData = DataController:getData()
                         for i = 1, 5 do
                             local seed = getSeed(i)
                             local itemData = UndergroundMarket[Functions.getRandom(UndergroundMarket, seed)]
-                            local priceItem = Util.itemUtils.getItemFromName(playerData, itemData.price:getName())
-                            local owned = priceItem and priceItem:getAmount() or 0
-                            local cost = itemData.price:getAmount()
-                            local affordable = owned >= cost
-                            local boughtData = playerData.undergroundMarketBought or {}
-                            local inStock = not boughtData[tostring(seed)]
-                            if inStock and affordable then
-                                RewardService:buyUndergroundMarket(i)
-                                task.wait(0.2)
+                            
+                            -- Create display name for this item
+                            local itemAmount = itemData.item.am or (typeof(itemData.item.getAmount) == "function" and itemData.item:getAmount()) or itemData.item.amount or 1
+                            local itemName = itemData.item.nm or itemData.item.am or (typeof(itemData.item.getName) == "function" and itemData.item:getName()) or tostring(itemData.item) or "Unknown"
+                            local priceAmount = itemData.price.am or (typeof(itemData.price.getAmount) == "function" and itemData.price:getAmount()) or itemData.price.amount or 1
+                            local priceName = itemData.price.nm or itemData.price.am or (typeof(itemData.price.getName) == "function" and itemData.price:getName()) or tostring(itemData.price) or "Unknown"
+                            local display = string.format("%sx %s - %sx %s", itemAmount, itemName, priceAmount, priceName)
+                            
+                            
+                            -- Check if this item is selected
+                            local isSelected = false
+                            for selectedDisplay, _ in pairs(selectedMarketItems) do
+                                if selectedDisplay == display then
+                                    isSelected = true
+                                    break
+                                end
+                            end
+
+                            
+                            if isSelected then
+                                local priceItem = Util.itemUtils.getItemFromName(playerData, itemData.price:getName())
+                                local owned = priceItem and priceItem:getAmount() or 0
+                                local cost = itemData.price:getAmount()
+                                local affordable = owned >= cost
+                                local boughtData = playerData.undergroundMarketBought or {}
+                                local inStock = not boughtData[tostring(seed)]
+                                
+                                if inStock and affordable then
+                                    RewardService:buyUndergroundMarket(i)
+                                    task.wait(0.2)
+                                else
+                                    if not inStock then
+                                    elseif not affordable then
+                                    end
+                                end
+                            else
                             end
                         end
                         task.wait(2)
@@ -1781,7 +1814,7 @@ BuildUI = function()
                                 else
                                 end
                                 
-                            elseif questType == "openEgg" and questName then
+elseif questType == "openEgg" and questName then
                                 
                                 local function getPickaxeDamage()
                                     local data = DataController:getData()
@@ -1850,10 +1883,34 @@ BuildUI = function()
                                     end
                                 end
 
-                                while not HatchingController._isHatching do
-                                    EggService.openEgg._re:FireServer(questName, 99)
+                                local lastQuestCheck = tick()
+                                while true do
+                                    -- Check if quest is still active every 3 seconds
+                                    if tick() - lastQuestCheck >= 3 then
+                                        local currentData = DataController:getData()
+                                        local questStillActive = false
+                                        
+                                        if currentData and currentData.quests and currentData.quests.active then
+                                            for _, activeQuest in pairs(currentData.quests.active) do
+                                                if activeQuest.questId == questId then
+                                                    questStillActive = true
+                                                    break
+                                                end
+                                            end
+                                        end
+                                        
+                                        if not questStillActive then
+                                            break
+                                        end
+                                        
+                                        lastQuestCheck = tick()
+                                    end
+                                    
+                                    if not HatchingController._isHatching then
+                                        EggService.openEgg._re:FireServer(questName, 99)
+                                    end
+                                    
                                     task.wait(0.2)
-                                    task.wait(0.05)
                                 end
                             end
                         end)
@@ -1861,7 +1918,7 @@ BuildUI = function()
                         task.wait(3)
                     end
                 end)
-            else                
+            else            
                 -- Restore previous settings
                 if autoMinerQuestThread then
                     task.cancel(autoMinerQuestThread)
