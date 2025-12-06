@@ -50,6 +50,40 @@ end)
 
 BuildUI = function()
 
+    local BalloonMinigameSection = Tabs.Machine:AddSection("Balloon Minigame")
+
+    BalloonMinigameSection:Paragraph("BalloonInfo", {
+        Title = "Guaranteed Rewards",
+        Content = "This feature automatically plays the 'hard' version of the balloon minigame, and gurantees you always receive the reward."
+    })
+
+    local autoBalloonMinigameEnabled = false
+    local autoBalloonMinigameThread = nil
+    
+    BalloonMinigameSection:Toggle("AutoBalloonMinigame", {
+        Title = "Auto Balloon Minigame (135M event)",
+        Default = false,
+        Callback = function(enabled)
+            autoBalloonMinigameEnabled = enabled
+
+            if autoBalloonMinigameThread then
+                task.cancel(autoBalloonMinigameThread)
+                autoBalloonMinigameThread = nil
+            end
+
+            if enabled then
+                autoBalloonMinigameThread = task.spawn(function()
+                    while autoBalloonMinigameEnabled do
+                        pcall(function()
+                            RewardService:playBalloonMinigame135M("hard")
+                        end)
+                        task.wait(0.5) 
+                    end
+                end)
+            end
+        end
+    })
+
     local CircusSection = Tabs.Machine:AddSection("Circus Minigame")
 
     CircusSection:Button({
